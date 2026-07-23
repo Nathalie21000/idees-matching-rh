@@ -264,6 +264,7 @@ elif page == "📚 CVthèque":
                 st.write(f"**Permis :** {permis if permis else 'Non renseigné'}")
 
                 st.caption(f"Ajouté le {date_creation}")
+                
 # ----------------------------
 # PAGE : IMPORT FICHE DE POSTE
 # ----------------------------
