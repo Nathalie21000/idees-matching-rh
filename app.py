@@ -101,6 +101,7 @@ page = st.sidebar.radio(
     [
         "📊 Tableau de bord",
         "📄 Importer un CV",
+        "📚 CVthèque",
         "🏢 Importer une fiche de poste",
         "🔍 Matching",
         "📋 Suivi des candidatures",
@@ -195,7 +196,74 @@ elif page == "📄 Importer un CV":
             with st.expander("Voir le texte extrait du CV"):
                 st.text(texte)
 
+# ----------------------------
+# PAGE : CVTHÈQUE
+# ----------------------------
 
+elif page == "📚 CVthèque":
+
+    st.title("📚 CVthèque")
+
+    recherche = st.text_input(
+        "Rechercher un candidat, un métier ou une compétence"
+    )
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            id,
+            candidat,
+            metier,
+            competences,
+            caces,
+            permis,
+            date_creation
+        FROM cv
+        WHERE agence=?
+        ORDER BY date_creation DESC
+    """, (agence,))
+
+    cvs = cursor.fetchall()
+    conn.close()
+
+    if not cvs:
+        st.info("Aucun CV enregistré pour cette agence.")
+
+    else:
+
+        for cv in cvs:
+
+            (
+                cv_id,
+                candidat,
+                metier,
+                competences,
+                caces,
+                permis,
+                date_creation,
+            ) = cv
+
+            texte_recherche = (
+                f"{candidat} {metier} {competences}"
+            ).lower()
+
+            if recherche:
+                if recherche.lower() not in texte_recherche:
+                    continue
+
+            with st.expander(f"👤 {candidat} - {metier}"):
+
+                st.write(f"**Métier :** {metier}")
+
+                st.write(f"**Compétences :** {competences}")
+
+                st.write(f"**CACES :** {caces if caces else 'Aucun'}")
+
+                st.write(f"**Permis :** {permis if permis else 'Non renseigné'}")
+
+                st.caption(f"Ajouté le {date_creation}")
 # ----------------------------
 # PAGE : IMPORT FICHE DE POSTE
 # ----------------------------
