@@ -203,7 +203,7 @@ elif page == "📄 Importer un CV":
 # PAGE : CVTHÈQUE
 # ----------------------------
 
-elif page == "📚 CVthèque":
+elif page == "📂 CVthèque":
 
     st.title("📚 CVthèque")
 
