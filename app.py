@@ -104,7 +104,7 @@ page = st.sidebar.radio(
     [
         "📊 Tableau de bord",
         "📄 Importer un CV",
-        "📚 CVthèque",
+        "📂 CVthèque",
         "🏢 Importer une fiche de poste",
         "🔍 Matching",
         "📋 Suivi des candidatures",
