@@ -27,11 +27,14 @@ st.set_page_config(
 
 # À adapter à la liste réelle des agences ID'EES INTERIM
 AGENCES = [
-    "Agence Paris",
-    "Agence Lyon",
-    "Agence Marseille",
-    "Agence Toulouse",
-    "Agence Nantes",
+    "Alençon",
+    "Avranches",
+    "Dinan",
+    "Honfleur",
+    "Le Mans",
+    "Rennes",
+    "Saint-Malo",
+
 ]
 
 STATUTS_SUIVI = [
