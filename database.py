@@ -211,3 +211,41 @@ def compter_suivi(agence, statut):
     conn.close()
 
     return nb
+def lister_cv(agence):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            id,
+            candidat,
+            metier,
+            competences,
+            caces,
+            permis,
+            date_creation
+        FROM cv
+        WHERE agence=?
+        ORDER BY date_creation DESC
+    """, (agence,))
+
+    resultats = cursor.fetchall()
+
+    conn.close()
+
+    return resultats
+
+
+def supprimer_cv(id_cv):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM cv WHERE id=?",
+        (id_cv,)
+    )
+
+    conn.commit()
+    conn.close()
