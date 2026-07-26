@@ -259,7 +259,7 @@ elif page == "📂 CVthèque":
                 date_creation,
             ) = cv
 
-                texte_recherche = (
+            texte_recherche = (
                 f"{candidat} {metier} {competences} {caces} {permis}"
             ).lower()
 
@@ -273,7 +273,7 @@ elif page == "📂 CVthèque":
                 continue
 
             if filtre_permis and filtre_permis.lower() not in permis.lower():
-                continue
+                continue              
 
             with st.expander(f"👤 {candidat} - {metier}"):
 
