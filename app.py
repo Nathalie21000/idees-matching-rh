@@ -259,21 +259,21 @@ elif page == "📂 CVthèque":
                 date_creation,
             ) = cv
 
-            texte_recherche = (
-    f"{candidat} {metier} {competences} {caces} {permis}"
-).lower()
+                texte_recherche = (
+                f"{candidat} {metier} {competences} {caces} {permis}"
+            ).lower()
 
-if recherche and recherche.lower() not in texte_recherche:
-    continue
+            if recherche and recherche.lower() not in texte_recherche:
+                continue
 
-if filtre_metier and filtre_metier.lower() not in metier.lower():
-    continue
+            if filtre_metier and filtre_metier.lower() not in metier.lower():
+                continue
 
-if filtre_caces and filtre_caces.lower() not in caces.lower():
-    continue
+            if filtre_caces and filtre_caces.lower() not in caces.lower():
+                continue
 
-if filtre_permis and filtre_permis.lower() not in permis.lower():
-    continue
+            if filtre_permis and filtre_permis.lower() not in permis.lower():
+                continue
 
             with st.expander(f"👤 {candidat} - {metier}"):
 
