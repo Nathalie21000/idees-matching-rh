@@ -207,20 +207,20 @@ elif page == "📂 CVthèque":
 
     st.title("📚 CVthèque")
 
- recherche = st.text_input(
-    "🔎 Rechercher un candidat, une compétence..."
-)
+    recherche = st.text_input(
+        "🔎 Rechercher un candidat, une compétence..."
+    )
 
-col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-with col1:
-    filtre_metier = st.text_input("👷 Métier")
+    with col1:
+        filtre_metier = st.text_input("👷 Métier")
 
-with col2:
-    filtre_caces = st.text_input("🚜 CACES")
+    with col2:
+        filtre_caces = st.text_input("🚜 CACES")
 
-with col3:
-    filtre_permis = st.text_input("🚗 Permis")
+    with col3:
+        filtre_permis = st.text_input("🚗 Permis")
 
     conn = get_connection()
     cursor = conn.cursor()
