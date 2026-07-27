@@ -13,7 +13,10 @@ from database import (
 )
 from matching import calculer_score
 from metiers import METIERS, detecter_metier
-from utils import extract_text
+from utils import (
+    extract_text,
+    generer_presentation,
+)
 
 # ----------------------------
 # CONFIGURATION GÉNÉRALE
