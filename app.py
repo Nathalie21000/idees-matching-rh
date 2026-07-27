@@ -428,7 +428,43 @@ elif page == "🔍 Matching":
                     conn.close()
                     st.success("Candidature ajoutée au suivi.")
 
+st.markdown("---")
 
+if st.button("📧 Générer une présentation", key=f"presentation_{r['cv_id']}"):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            candidat,
+            metier,
+            competences,
+            caces,
+            permis
+        FROM cv
+        WHERE id=?
+    """, (r["cv_id"],))
+
+    candidat, metier, competences, caces, permis = cursor.fetchone()
+
+    conn.close()
+
+    texte = generer_presentation(
+        candidat,
+        metier,
+        competences,
+        caces,
+        permis,
+        entreprise_nom,
+        agence,
+    )
+
+    st.text_area(
+        "Présentation prête à copier",
+        value=texte,
+        height=300,
+    )
 # ----------------------------
 # PAGE : SUIVI DES CANDIDATURES
 # ----------------------------
