@@ -465,6 +465,7 @@ if st.button("📧 Générer une présentation", key=f"presentation_{r['cv_id']}
         value=texte,
         height=300,
     )
+    
 # ----------------------------
 # PAGE : SUIVI DES CANDIDATURES
 # ----------------------------
