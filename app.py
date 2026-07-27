@@ -430,7 +430,7 @@ elif page == "🔍 Matching":
 
 st.markdown("---")
 
-if st.button("📧 Générer une présentation", key=f"presentation_{r['cv_id']}"):
+                if st.button("📧 Générer une présentation", key=f"presentation_{r['cv_id']}"):
 
     conn = get_connection()
     cursor = conn.cursor()
