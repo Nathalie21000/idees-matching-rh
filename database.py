@@ -249,3 +249,27 @@ def supprimer_cv(id_cv):
 
     conn.commit()
     conn.close()
+# ----------------------------
+# STATISTIQUES HEBDOMADAIRES
+# ----------------------------
+
+def statistiques_par_semaine(agence):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            strftime('%Y-%W', date_creation) AS semaine,
+            COUNT(*)
+        FROM suivi
+        WHERE agence=?
+        GROUP BY semaine
+        ORDER BY semaine DESC
+    """, (agence,))
+
+    resultat = cursor.fetchall()
+
+    conn.close()
+
+    return resultat
