@@ -417,54 +417,73 @@ elif page == "🔍 Matching":
                 if st.button("Ajouter au suivi", key=f"suivi_{r['cv_id']}"):
                     conn = get_connection()
                     cursor = conn.cursor()
+
                     cursor.execute(
                         """
-                        INSERT INTO suivi(agence, candidat, entreprise, poste, statut)
+                        INSERT INTO suivi(
+                            agence,
+                            candidat,
+                            entreprise,
+                            poste,
+                            statut
+                        )
                         VALUES(?,?,?,?,?)
                         """,
-                        (agence, r["candidat"], entreprise_nom, poste_nom, statut),
+                        (
+                            agence,
+                            r["candidat"],
+                            entreprise_nom,
+                            poste_nom,
+                            statut,
+                        ),
                     )
+
                     conn.commit()
                     conn.close()
+
                     st.success("Candidature ajoutée au suivi.")
 
-st.markdown("---")
+                st.markdown("---")
 
- if st.button("📧 Générer une présentation", key=f"presentation_{r['cv_id']}"):
+                if st.button(
+                    "📧 Générer une présentation",
+                    key=f"presentation_{r['cv_id']}"
+                ):
 
-    conn = get_connection()
-    cursor = conn.cursor()
+                    conn = get_connection()
+                    cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT
-            candidat,
-            metier,
-            competences,
-            caces,
-            permis
-        FROM cv
-        WHERE id=?
-    """, (r["cv_id"],))
+                    cursor.execute("""
+                        SELECT
+                            candidat,
+                            metier,
+                            competences,
+                            caces,
+                            permis
+                        FROM cv
+                        WHERE id=?
+                    """, (r["cv_id"],))
 
-    candidat, metier, competences, caces, permis = cursor.fetchone()
+                    candidat, metier, competences, caces, permis = cursor.fetchone()
 
-    conn.close()
+                    conn.close()
 
-    texte = generer_presentation(
-        candidat,
-        metier,
-        competences,
-        caces,
-        permis,
-        entreprise_nom,
-        agence,
-    )
+                    texte = generer_presentation(
+                        candidat,
+                        metier,
+                        competences,
+                        caces,
+                        permis,
+                        entreprise_nom,
+                        agence,
+                    )
 
-    st.text_area(
-        "Présentation prête à copier",
-        value=texte,
-        height=300,
-    )
+                    st.text_area(
+                        "Présentation prête à copier",
+                        value=texte,
+                        height=300,
+                        key=f"texte_{r['cv_id']}"
+                    )
     
 # ----------------------------
 # PAGE : SUIVI DES CANDIDATURES
