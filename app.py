@@ -10,6 +10,7 @@ from database import (
     compter_cv,
     compter_postes,
     compter_suivi,
+    statistiques_par_semaine,
 )
 from matching import calculer_score
 from metiers import METIERS, detecter_metier
@@ -111,6 +112,8 @@ page = st.sidebar.radio(
         "🏢 Importer une fiche de poste",
         "🔍 Matching",
         "📋 Suivi des candidatures",
+        "📈 Statistiques",
+        
     ],
 )
 
@@ -532,4 +535,23 @@ elif page == "📋 Suivi des candidatures":
                     conn.close()
                     st.rerun()
 
+# ----------------------------
+# PAGE : STATISTIQUES
+# ----------------------------
+
+elif page == "📈 Statistiques":
+
+    st.title("📈 Statistiques de l'agence")
+
+    st.subheader("Activité par semaine")
+
+    stats = statistiques_par_semaine(agence)
+
+    if not stats:
+        st.info("Aucune donnée disponible.")
+    else:
+
+        for semaine, nb in stats:
+
+            st.write(f"📅 **{semaine}** : {nb} candidature(s)")            
             st.markdown("---")
