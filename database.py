@@ -16,19 +16,18 @@ def init_db():
     # TABLE CV
     # ----------------------------
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS cv(
+    CREATE TABLE IF NOT EXISTS cv (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         agence TEXT,
-        nom_fichier TEXT,
         candidat TEXT,
         metier TEXT,
         competences TEXT,
         caces TEXT,
         permis TEXT,
-        texte TEXT,
-        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        type_profil TEXT,
+        date_creation TEXT
     )
-    """)
+""")
 
     # ----------------------------
     # TABLE POSTES
@@ -51,16 +50,17 @@ def init_db():
     # TABLE SUIVI
     # ----------------------------
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS suivi(
+    CREATE TABLE IF NOT EXISTS suivi (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         agence TEXT,
         candidat TEXT,
         entreprise TEXT,
         poste TEXT,
         statut TEXT,
-        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        type_entreprise TEXT,
+        date_creation TEXT
     )
-    """)
+""")
 
     conn.commit()
     conn.close()
