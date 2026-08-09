@@ -162,14 +162,20 @@ elif page == "📄 Importer un CV":
 
     st.title("📄 Importer un CV")
 
-    fichier = st.file_uploader("Sélectionnez un CV (PDF)", type=["pdf"])
+    fichier = st.file_uploader(
+        "Sélectionnez un CV (PDF)",
+        type=["pdf"]
+    )
 
     if fichier is not None:
 
         texte = extract_text(fichier)
 
         if not texte:
-            st.error("Impossible d'extraire le texte de ce PDF (fichier scanné ?).")
+            st.error(
+                "Impossible d'extraire le texte de ce PDF (fichier scanné ?)."
+            )
+
         else:
             candidat_detecte = extraire_candidat(fichier.name)
             metier_detecte = detecter_metier(texte)
@@ -177,18 +183,49 @@ elif page == "📄 Importer un CV":
             caces_detectes = extraire_caces(texte)
             permis_detectes = extraire_permis(texte)
 
-            st.success("CV analysé avec succès. Vérifiez les informations avant d'enregistrer.")
+            st.success(
+                "CV analysé avec succès. Vérifiez les informations avant d'enregistrer."
+            )
 
             with st.form("form_cv"):
-                candidat = st.text_input("Nom du candidat", value=candidat_detecte)
-                metier = st.text_input("Métier détecté", value=metier_detecte)
-                competences = st.text_area("Compétences détectées", value=competences_detectees)
-                caces = st.text_input("CACES détectés", value=caces_detectes)
-                permis = st.text_input("Permis détectés", value=permis_detectes)
 
-                valider = st.form_submit_button("Enregistrer ce CV")
+                candidat = st.text_input(
+                    "Nom du candidat",
+                    value=candidat_detecte
+                )
+
+                metier = st.text_input(
+                    "Métier détecté",
+                    value=metier_detecte
+                )
+
+                competences = st.text_area(
+                    "Compétences détectées",
+                    value=competences_detectees
+                )
+
+                caces = st.text_input(
+                    "CACES détectés",
+                    value=caces_detectes
+                )
+
+                permis = st.text_input(
+                    "Permis détectés",
+                    value=permis_detectes
+                )
+
+                type_profil = st.radio(
+                    "Type de profil",
+                    ["🟢 Intérimaire", "🟡 Candidat"],
+                    horizontal=True,
+                )
+
+                valider = st.form_submit_button(
+                    "Enregistrer ce CV"
+                )
 
             if valider:
+
                 enregistrer_cv(
                     agence,
                     fichier.name,
@@ -197,9 +234,14 @@ elif page == "📄 Importer un CV":
                     competences,
                     caces,
                     permis,
+                    type_profil,
                     texte,
                 )
-                st.success(f"CV de {candidat} enregistré pour {agence}.")
+
+                st.success(
+                    f"CV de {candidat} enregistré pour {agence}."
+                )
+
                 st.rerun()
 
             with st.expander("Voir le texte extrait du CV"):
