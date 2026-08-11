@@ -1,11 +1,21 @@
 import sqlite3
+from datetime import datetime
+
 
 DB_NAME = "assorti.db"
 
 
+# ----------------------------
+# CONNEXION À LA BASE
+# ----------------------------
+
 def get_connection():
     return sqlite3.connect(DB_NAME)
 
+
+# ----------------------------
+# INITIALISATION DE LA BASE
+# ----------------------------
 
 def init_db():
 
@@ -15,52 +25,57 @@ def init_db():
     # ----------------------------
     # TABLE CV
     # ----------------------------
+
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS cv (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        agence TEXT,
-        candidat TEXT,
-        metier TEXT,
-        competences TEXT,
-        caces TEXT,
-        permis TEXT,
-        type_profil TEXT,
-        date_creation TEXT
-    )
-""")
+        CREATE TABLE IF NOT EXISTS cv (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agence TEXT,
+            nom_fichier TEXT,
+            candidat TEXT,
+            metier TEXT,
+            competences TEXT,
+            caces TEXT,
+            permis TEXT,
+            type_profil TEXT,
+            texte TEXT,
+            date_creation TEXT
+        )
+    """)
 
     # ----------------------------
     # TABLE POSTES
     # ----------------------------
+
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS postes(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        agence TEXT,
-        entreprise TEXT,
-        poste TEXT,
-        competences TEXT,
-        caces TEXT,
-        permis TEXT,
-        texte TEXT,
-        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS postes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agence TEXT,
+            entreprise TEXT,
+            poste TEXT,
+            competences TEXT,
+            caces TEXT,
+            permis TEXT,
+            texte TEXT,
+            date_creation TEXT
+        )
     """)
 
     # ----------------------------
     # TABLE SUIVI
     # ----------------------------
+
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS suivi (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        agence TEXT,
-        candidat TEXT,
-        entreprise TEXT,
-        poste TEXT,
-        statut TEXT,
-        type_entreprise TEXT,
-        date_creation TEXT
-    )
-""")
+        CREATE TABLE IF NOT EXISTS suivi (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agence TEXT,
+            candidat TEXT,
+            entreprise TEXT,
+            poste TEXT,
+            statut TEXT,
+            type_entreprise TEXT,
+            date_creation TEXT
+        )
+    """)
 
     conn.commit()
     conn.close()
@@ -78,25 +93,29 @@ def enregistrer_cv(
     competences,
     caces,
     permis,
+    type_profil,
     texte
 ):
 
     conn = get_connection()
-
     cursor = conn.cursor()
 
+    date_creation = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     cursor.execute("""
-    INSERT INTO cv(
-        agence,
-        nom_fichier,
-        candidat,
-        metier,
-        competences,
-        caces,
-        permis,
-        texte
-    )
-    VALUES(?,?,?,?,?,?,?,?)
+        INSERT INTO cv (
+            agence,
+            nom_fichier,
+            candidat,
+            metier,
+            competences,
+            caces,
+            permis,
+            type_profil,
+            texte,
+            date_creation
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         agence,
         nom_fichier,
@@ -105,7 +124,9 @@ def enregistrer_cv(
         competences,
         caces,
         permis,
-        texte
+        type_profil,
+        texte,
+        date_creation
     ))
 
     conn.commit()
@@ -127,20 +148,22 @@ def enregistrer_poste(
 ):
 
     conn = get_connection()
-
     cursor = conn.cursor()
 
+    date_creation = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     cursor.execute("""
-    INSERT INTO postes(
-        agence,
-        entreprise,
-        poste,
-        competences,
-        caces,
-        permis,
-        texte
-    )
-    VALUES(?,?,?,?,?,?,?)
+        INSERT INTO postes (
+            agence,
+            entreprise,
+            poste,
+            competences,
+            caces,
+            permis,
+            texte,
+            date_creation
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         agence,
         entreprise,
@@ -148,7 +171,8 @@ def enregistrer_poste(
         competences,
         caces,
         permis,
-        texte
+        texte,
+        date_creation
     ))
 
     conn.commit()
@@ -162,7 +186,6 @@ def enregistrer_poste(
 def compter_cv(agence):
 
     conn = get_connection()
-
     cursor = conn.cursor()
 
     cursor.execute(
@@ -180,7 +203,6 @@ def compter_cv(agence):
 def compter_postes(agence):
 
     conn = get_connection()
-
     cursor = conn.cursor()
 
     cursor.execute(
@@ -198,7 +220,6 @@ def compter_postes(agence):
 def compter_suivi(agence, statut):
 
     conn = get_connection()
-
     cursor = conn.cursor()
 
     cursor.execute(
@@ -211,6 +232,12 @@ def compter_suivi(agence, statut):
     conn.close()
 
     return nb
+
+
+# ----------------------------
+# LISTE DES CV
+# ----------------------------
+
 def lister_cv(agence):
 
     conn = get_connection()
@@ -224,6 +251,7 @@ def lister_cv(agence):
             competences,
             caces,
             permis,
+            type_profil,
             date_creation
         FROM cv
         WHERE agence=?
@@ -237,6 +265,10 @@ def lister_cv(agence):
     return resultats
 
 
+# ----------------------------
+# SUPPRESSION CV
+# ----------------------------
+
 def supprimer_cv(id_cv):
 
     conn = get_connection()
@@ -249,6 +281,8 @@ def supprimer_cv(id_cv):
 
     conn.commit()
     conn.close()
+
+
 # ----------------------------
 # STATISTIQUES HEBDOMADAIRES
 # ----------------------------
@@ -273,3 +307,4 @@ def statistiques_par_semaine(agence):
     conn.close()
 
     return resultat
+ 
