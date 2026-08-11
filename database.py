@@ -14,6 +14,22 @@ def get_connection():
 
 
 # ----------------------------
+# AJOUT AUTOMATIQUE DES COLONNES
+# MANQUANTES
+# ----------------------------
+
+def ajouter_colonne_si_absente(cursor, table, colonne, type_colonne="TEXT"):
+
+    cursor.execute(f"PRAGMA table_info({table})")
+    colonnes_existantes = [ligne[1] for ligne in cursor.fetchall()]
+
+    if colonne not in colonnes_existantes:
+        cursor.execute(
+            f"ALTER TABLE {table} ADD COLUMN {colonne} {type_colonne}"
+        )
+
+
+# ----------------------------
 # INITIALISATION DE LA BASE
 # ----------------------------
 
@@ -77,6 +93,118 @@ def init_db():
         )
     """)
 
+    # ----------------------------
+    # MIGRATION TABLE CV
+    # ----------------------------
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "agence"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "nom_fichier"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "candidat"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "metier"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "competences"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "caces"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "permis"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "type_profil"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "texte"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "cv", "date_creation"
+    )
+
+    # ----------------------------
+    # MIGRATION TABLE POSTES
+    # ----------------------------
+
+    ajouter_colonne_si_absente(
+        cursor, "postes", "agence"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "postes", "entreprise"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "postes", "poste"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "postes", "competences"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "postes", "caces"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "postes", "permis"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "postes", "texte"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "postes", "date_creation"
+    )
+
+    # ----------------------------
+    # MIGRATION TABLE SUIVI
+    # ----------------------------
+
+    ajouter_colonne_si_absente(
+        cursor, "suivi", "agence"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "suivi", "candidat"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "suivi", "entreprise"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "suivi", "poste"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "suivi", "statut"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "suivi", "type_entreprise"
+    )
+
+    ajouter_colonne_si_absente(
+        cursor, "suivi", "date_creation"
+    )
+
     conn.commit()
     conn.close()
 
@@ -100,7 +228,9 @@ def enregistrer_cv(
     conn = get_connection()
     cursor = conn.cursor()
 
-    date_creation = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    date_creation = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
 
     cursor.execute("""
         INSERT INTO cv (
@@ -150,7 +280,9 @@ def enregistrer_poste(
     conn = get_connection()
     cursor = conn.cursor()
 
-    date_creation = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    date_creation = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
 
     cursor.execute("""
         INSERT INTO postes (
@@ -223,7 +355,11 @@ def compter_suivi(agence, statut):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT COUNT(*) FROM suivi WHERE agence=? AND statut=?",
+        """
+        SELECT COUNT(*)
+        FROM suivi
+        WHERE agence=? AND statut=?
+        """,
         (agence, statut)
     )
 
@@ -307,4 +443,3 @@ def statistiques_par_semaine(agence):
     conn.close()
 
     return resultat
- 
