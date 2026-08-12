@@ -137,6 +137,29 @@ if page == "📊 Tableau de bord":
     col4.metric("Recrutements", compter_suivi(agence, "Recruté"))
 
     st.markdown("---")
+
+    col5, col6 = st.columns(2)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM suivi WHERE agence=? AND type_entreprise=?",
+        (agence, "🟢 Client"),
+    )
+    nb_clients = cursor.fetchone()[0]
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM suivi WHERE agence=? AND type_entreprise=?",
+        (agence, "🟠 Prospect"),
+    )
+    nb_prospects = cursor.fetchone()[0]
+
+    conn.close()
+
+    col5.metric("🟢 CV envoyés à des clients", nb_clients)
+    col6.metric("🟠 CV envoyés à des prospects", nb_prospects)
+
     st.subheader("Répartition des candidatures par statut")
 
     conn = get_connection()
@@ -281,6 +304,7 @@ elif page == "📂 CVthèque":
             competences,
             caces,
             permis,
+            type_profil,
             date_creation
         FROM cv
         WHERE agence=?
@@ -304,6 +328,7 @@ elif page == "📂 CVthèque":
                 competences,
                 caces,
                 permis,
+                type_profil,
                 date_creation,
             ) = cv
 
@@ -332,6 +357,11 @@ elif page == "📂 CVthèque":
                 st.write(f"**CACES :** {caces if caces else 'Aucun'}")
 
                 st.write(f"**Permis :** {permis if permis else 'Non renseigné'}")
+
+                if type_profil == "🟢 Intérimaire":
+                    st.write("**Type de profil :** 🟢 Intérimaire")
+                else:
+                    st.write("**Type de profil :** 🟡 Candidat")
 
                 st.caption(f"Ajouté le {date_creation}")
                 
@@ -459,6 +489,13 @@ elif page == "🔍 Matching":
                     key=f"statut_{r['cv_id']}",
                 )
 
+                type_entreprise = st.radio(
+                    "Type d'entreprise",
+                    ["🟢 Client", "🟠 Prospect"],
+                    horizontal=True,
+                    key=f"type_entreprise_{r['cv_id']}",
+                )
+
                 if st.button("Ajouter au suivi", key=f"suivi_{r['cv_id']}"):
                     conn = get_connection()
                     cursor = conn.cursor()
@@ -470,9 +507,11 @@ elif page == "🔍 Matching":
                             candidat,
                             entreprise,
                             poste,
-                            statut
+                            statut,
+                            type_entreprise,
+                            date_creation
                         )
-                        VALUES(?,?,?,?,?)
+                        VALUES(?,?,?,?,?,?,?)
                         """,
                         (
                             agence,
@@ -480,6 +519,8 @@ elif page == "🔍 Matching":
                             entreprise_nom,
                             poste_nom,
                             statut,
+                            type_entreprise,
+                            __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         ),
                     )
 
@@ -541,7 +582,7 @@ elif page == "📋 Suivi des candidatures":
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, candidat, entreprise, poste, statut, date_creation "
+        "SELECT id, candidat, entreprise, poste, statut, type_entreprise, date_creation "
         "FROM suivi WHERE agence=? ORDER BY date_creation DESC",
         (agence,),
     )
@@ -551,11 +592,17 @@ elif page == "📋 Suivi des candidatures":
     if not lignes:
         st.info("Aucune candidature suivie pour le moment.")
     else:
-        for suivi_id, candidat, entreprise, poste, statut, date_creation in lignes:
+        for suivi_id, candidat, entreprise, poste, statut, type_entreprise, date_creation in lignes:
             col1, col2 = st.columns([4, 2])
 
             with col1:
                 st.write(f"**{candidat}** → {poste} chez {entreprise}")
+
+                if type_entreprise == "🟢 Client":
+                    st.caption("🟢 Client")
+                elif type_entreprise == "🟠 Prospect":
+                    st.caption("🟠 Prospect")
+
                 st.caption(f"Ajouté le {date_creation}")
 
             with col2:
