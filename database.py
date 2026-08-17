@@ -67,7 +67,7 @@ def enregistrer_cv(
         "texte": texte,
     }
 
-    resultat = supabase.table("cv").insert(donnees).execute()
+ resultat = supabase.table("cv").insert(donnees).execute()
 
 if not resultat.data:
     raise RuntimeError(
