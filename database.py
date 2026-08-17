@@ -1,217 +1,48 @@
-import sqlite3
-from datetime import datetime
+import streamlit as st
+
+from supabase import create_client, Client
 
 
-DB_NAME = "assorti.db"
+# ============================================================
+# CONNEXION SUPABASE
+# ============================================================
+
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+supabase: Client = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY,
+)
 
 
-# ----------------------------
-# CONNEXION À LA BASE
-# ----------------------------
-
-def get_connection():
-    return sqlite3.connect(DB_NAME)
-
-
-# ----------------------------
-# AJOUT AUTOMATIQUE DES COLONNES
-# MANQUANTES
-# ----------------------------
-
-def ajouter_colonne_si_absente(cursor, table, colonne, type_colonne="TEXT"):
-
-    cursor.execute(f"PRAGMA table_info({table})")
-    colonnes_existantes = [ligne[1] for ligne in cursor.fetchall()]
-
-    if colonne not in colonnes_existantes:
-        cursor.execute(
-            f"ALTER TABLE {table} ADD COLUMN {colonne} {type_colonne}"
-        )
-
-
-# ----------------------------
-# INITIALISATION DE LA BASE
-# ----------------------------
+# ============================================================
+# INITIALISATION
+# ============================================================
 
 def init_db():
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    # ----------------------------
-    # TABLE CV
-    # ----------------------------
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS cv (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agence TEXT,
-            nom_fichier TEXT,
-            candidat TEXT,
-            metier TEXT,
-            competences TEXT,
-            caces TEXT,
-            permis TEXT,
-            type_profil TEXT,
-            texte TEXT,
-            date_creation TEXT
-        )
-    """)
-
-    # ----------------------------
-    # TABLE POSTES
-    # ----------------------------
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS postes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agence TEXT,
-            entreprise TEXT,
-            poste TEXT,
-            competences TEXT,
-            caces TEXT,
-            permis TEXT,
-            texte TEXT,
-            date_creation TEXT
-        )
-    """)
-
-    # ----------------------------
-    # TABLE SUIVI
-    # ----------------------------
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS suivi (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agence TEXT,
-            candidat TEXT,
-            entreprise TEXT,
-            poste TEXT,
-            statut TEXT,
-            type_entreprise TEXT,
-            date_creation TEXT
-        )
-    """)
-
-    # ----------------------------
-    # MIGRATION TABLE CV
-    # ----------------------------
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "agence"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "nom_fichier"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "candidat"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "metier"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "competences"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "caces"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "permis"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "type_profil"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "texte"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "cv", "date_creation"
-    )
-
-    # ----------------------------
-    # MIGRATION TABLE POSTES
-    # ----------------------------
-
-    ajouter_colonne_si_absente(
-        cursor, "postes", "agence"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "postes", "entreprise"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "postes", "poste"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "postes", "competences"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "postes", "caces"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "postes", "permis"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "postes", "texte"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "postes", "date_creation"
-    )
-
-    # ----------------------------
-    # MIGRATION TABLE SUIVI
-    # ----------------------------
-
-    ajouter_colonne_si_absente(
-        cursor, "suivi", "agence"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "suivi", "candidat"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "suivi", "entreprise"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "suivi", "poste"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "suivi", "statut"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "suivi", "type_entreprise"
-    )
-
-    ajouter_colonne_si_absente(
-        cursor, "suivi", "date_creation"
-    )
-
-    conn.commit()
-    conn.close()
+    """
+    Supabase possède déjà les tables.
+    Cette fonction est conservée pour que app.py
+    puisse continuer à appeler init_db().
+    """
+    return None
 
 
-# ----------------------------
-# ENREGISTREMENT CV
-# ----------------------------
+# ============================================================
+# CONNEXION
+# ============================================================
+
+def get_connection():
+    """
+    Retourne la connexion Supabase.
+    """
+    return supabase
+
+
+# ============================================================
+# ENREGISTREMENT D'UN CV
+# ============================================================
 
 def enregistrer_cv(
     agence,
@@ -222,50 +53,26 @@ def enregistrer_cv(
     caces,
     permis,
     type_profil,
-    texte
+    texte,
 ):
+    donnees = {
+        "agence": agence,
+        "nom_fichier": nom_fichier,
+        "candidat": candidat,
+        "metier": metier,
+        "competences": competences,
+        "caces": caces,
+        "permis": permis,
+        "type_profil": type_profil,
+        "texte": texte,
+    }
 
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    date_creation = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
-    cursor.execute("""
-        INSERT INTO cv (
-            agence,
-            nom_fichier,
-            candidat,
-            metier,
-            competences,
-            caces,
-            permis,
-            type_profil,
-            texte,
-            date_creation
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        agence,
-        nom_fichier,
-        candidat,
-        metier,
-        competences,
-        caces,
-        permis,
-        type_profil,
-        texte,
-        date_creation
-    ))
-
-    conn.commit()
-    conn.close()
+    return supabase.table("cv").insert(donnees).execute()
 
 
-# ----------------------------
-# ENREGISTREMENT POSTE
-# ----------------------------
+# ============================================================
+# ENREGISTREMENT D'UNE FICHE DE POSTE
+# ============================================================
 
 def enregistrer_poste(
     agence,
@@ -274,172 +81,214 @@ def enregistrer_poste(
     competences,
     caces,
     permis,
-    texte
+    texte,
 ):
+    donnees = {
+        "agence": agence,
+        "entreprise": entreprise,
+        "poste": poste,
+        "competences": competences,
+        "caces": caces,
+        "permis": permis,
+        "texte": texte,
+    }
 
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    date_creation = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
-    cursor.execute("""
-        INSERT INTO postes (
-            agence,
-            entreprise,
-            poste,
-            competences,
-            caces,
-            permis,
-            texte,
-            date_creation
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        agence,
-        entreprise,
-        poste,
-        competences,
-        caces,
-        permis,
-        texte,
-        date_creation
-    ))
-
-    conn.commit()
-    conn.close()
+    return supabase.table("postes").insert(donnees).execute()
 
 
-# ----------------------------
-# TABLEAU DE BORD
-# ----------------------------
+# ============================================================
+# ENREGISTREMENT DU SUIVI
+# ============================================================
+
+def enregistrer_suivi(
+    agence,
+    candidat,
+    entreprise,
+    poste,
+    statut,
+    type_entreprise=None,
+):
+    donnees = {
+        "agence": agence,
+        "candidat": candidat,
+        "entreprise": entreprise,
+        "poste": poste,
+        "statut": statut,
+        "type_entreprise": type_entreprise,
+    }
+
+    return supabase.table("suivi").insert(donnees).execute()
+
+
+# ============================================================
+# COMPTER LES CV
+# ============================================================
 
 def compter_cv(agence):
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT COUNT(*) FROM cv WHERE agence=?",
-        (agence,)
+    resultat = (
+        supabase
+        .table("cv")
+        .select("id", count="exact")
+        .eq("agence", agence)
+        .execute()
     )
 
-    nb = cursor.fetchone()[0]
+    return resultat.count or 0
 
-    conn.close()
 
-    return nb
-
+# ============================================================
+# COMPTER LES POSTES
+# ============================================================
 
 def compter_postes(agence):
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT COUNT(*) FROM postes WHERE agence=?",
-        (agence,)
+    resultat = (
+        supabase
+        .table("postes")
+        .select("id", count="exact")
+        .eq("agence", agence)
+        .execute()
     )
 
-    nb = cursor.fetchone()[0]
+    return resultat.count or 0
 
-    conn.close()
 
-    return nb
-
+# ============================================================
+# COMPTER LE SUIVI PAR STATUT
+# ============================================================
 
 def compter_suivi(agence, statut):
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        SELECT COUNT(*)
-        FROM suivi
-        WHERE agence=? AND statut=?
-        """,
-        (agence, statut)
+    resultat = (
+        supabase
+        .table("suivi")
+        .select("id", count="exact")
+        .eq("agence", agence)
+        .eq("statut", statut)
+        .execute()
     )
 
-    nb = cursor.fetchone()[0]
-
-    conn.close()
-
-    return nb
+    return resultat.count or 0
 
 
-# ----------------------------
-# LISTE DES CV
-# ----------------------------
+# ============================================================
+# LISTER LES CV
+# ============================================================
 
 def lister_cv(agence):
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT
-            id,
-            candidat,
-            metier,
-            competences,
-            caces,
-            permis,
-            type_profil,
-            date_creation
-        FROM cv
-        WHERE agence=?
-        ORDER BY date_creation DESC
-    """, (agence,))
-
-    resultats = cursor.fetchall()
-
-    conn.close()
-
-    return resultats
-
-
-# ----------------------------
-# SUPPRESSION CV
-# ----------------------------
-
-def supprimer_cv(id_cv):
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "DELETE FROM cv WHERE id=?",
-        (id_cv,)
+    resultat = (
+        supabase
+        .table("cv")
+        .select(
+            "id, candidat, metier, competences, "
+            "caces, permis, type_profil, date_creation"
+        )
+        .eq("agence", agence)
+        .order("date_creation", desc=True)
+        .execute()
     )
 
-    conn.commit()
-    conn.close()
+    return resultat.data or []
 
 
-# ----------------------------
-# STATISTIQUES HEBDOMADAIRES
-# ----------------------------
+# ============================================================
+# RECUPERER LES CV POUR LE MATCHING
+# ============================================================
+
+def recuperer_cvs_matching(agence):
+    resultat = (
+        supabase
+        .table("cv")
+        .select(
+            "id, candidat, texte, metier, competences, "
+            "caces, permis, type_profil"
+        )
+        .eq("agence", agence)
+        .order("date_creation", desc=True)
+        .execute()
+    )
+
+    return resultat.data or []
+
+
+# ============================================================
+# RECUPERER LES FICHES DE POSTE
+# ============================================================
+
+def recuperer_postes(agence):
+    resultat = (
+        supabase
+        .table("postes")
+        .select(
+            "id, entreprise, poste, competences, "
+            "caces, permis, texte"
+        )
+        .eq("agence", agence)
+        .order("date_creation", desc=True)
+        .execute()
+    )
+
+    return resultat.data or []
+
+
+# ============================================================
+# RECUPERER UNE FICHE DE POSTE
+# ============================================================
+
+def recuperer_poste(id_poste):
+    resultat = (
+        supabase
+        .table("postes")
+        .select(
+            "id, entreprise, poste, competences, "
+            "caces, permis, texte"
+        )
+        .eq("id", id_poste)
+        .single()
+        .execute()
+    )
+
+    return resultat.data
+
+
+# ============================================================
+# SUPPRIMER UN CV
+# ============================================================
+
+def supprimer_cv(id_cv):
+    return (
+        supabase
+        .table("cv")
+        .delete()
+        .eq("id", id_cv)
+        .execute()
+    )
+
+
+# ============================================================
+# STATISTIQUES
+# ============================================================
 
 def statistiques_par_semaine(agence):
+    resultat = (
+        supabase
+        .table("suivi")
+        .select("date_creation")
+        .eq("agence", agence)
+        .order("date_creation", desc=True)
+        .execute()
+    )
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    lignes = resultat.data or []
 
-    cursor.execute("""
-        SELECT
-            strftime('%Y-%W', date_creation) AS semaine,
-            COUNT(*)
-        FROM suivi
-        WHERE agence=?
-        GROUP BY semaine
-        ORDER BY semaine DESC
-    """, (agence,))
+    statistiques = {}
 
-    resultat = cursor.fetchall()
+    for ligne in lignes:
+        date_creation = ligne.get("date_creation")
 
-    conn.close()
+        if not date_creation:
+            continue
 
-    return resultat
+        semaine = str(date_creation)[:10]
+
+        statistiques[semaine] = statistiques.get(semaine, 0) + 1
+
+    return list(statistiques.items())
