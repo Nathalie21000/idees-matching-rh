@@ -67,7 +67,14 @@ def enregistrer_cv(
         "texte": texte,
     }
 
-    return supabase.table("cv").insert(donnees).execute()
+    resultat = supabase.table("cv").insert(donnees).execute()
+
+if not resultat.data:
+    raise RuntimeError(
+        f"Supabase n'a retourné aucune donnée après l'enregistrement du CV : {resultat}"
+    )
+
+return resultat
 
 
 # ============================================================
