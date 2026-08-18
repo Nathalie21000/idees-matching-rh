@@ -23,22 +23,13 @@ supabase: Client = create_client(
 def init_db():
     """
     Supabase possède déjà les tables.
-    Cette fonction est conservée pour que app.py
-    puisse continuer à appeler init_db().
+    Fonction conservée pour rester compatible avec app.py.
     """
     return None
 
 
 # ============================================================
-# CONNEXION
-# ============================================================
-
-def get_connection():
-    return supabase
-
-
-# ============================================================
-# ENREGISTRER UN CV
+# ENREGISTREMENT D'UN CV
 # ============================================================
 
 def enregistrer_cv(
@@ -77,11 +68,11 @@ def enregistrer_cv(
             f"l'enregistrement du CV : {resultat}"
         )
 
-    return resultat
+    return resultat.data[0]
 
 
 # ============================================================
-# ENREGISTRER UNE FICHE DE POSTE
+# ENREGISTREMENT D'UNE FICHE DE POSTE
 # ============================================================
 
 def enregistrer_poste(
@@ -116,11 +107,11 @@ def enregistrer_poste(
             f"l'enregistrement de la fiche de poste : {resultat}"
         )
 
-    return resultat
+    return resultat.data[0]
 
 
 # ============================================================
-# ENREGISTRER UN SUIVI
+# ENREGISTREMENT D'UN SUIVI
 # ============================================================
 
 def enregistrer_suivi(
@@ -140,12 +131,20 @@ def enregistrer_suivi(
         "type_entreprise": type_entreprise,
     }
 
-    return (
+    resultat = (
         supabase
         .table("suivi")
         .insert(donnees)
         .execute()
     )
+
+    if not resultat.data:
+        raise RuntimeError(
+            "Supabase n'a retourné aucune donnée après "
+            f"l'enregistrement du suivi : {resultat}"
+        )
+
+    return resultat.data[0]
 
 
 # ============================================================
@@ -181,7 +180,7 @@ def compter_postes(agence):
 
 
 # ============================================================
-# COMPTER LE SUIVI PAR STATUT
+# COMPTER LE SUIVI
 # ============================================================
 
 def compter_suivi(agence, statut):
@@ -198,6 +197,66 @@ def compter_suivi(agence, statut):
 
 
 # ============================================================
+# COMPTER LES CLIENTS
+# ============================================================
+
+def compter_clients(agence):
+    resultat = (
+        supabase
+        .table("suivi")
+        .select("id", count="exact")
+        .eq("agence", agence)
+        .eq("type_entreprise", "🟢 Client")
+        .execute()
+    )
+
+    return resultat.count or 0
+
+
+# ============================================================
+# COMPTER LES PROSPECTS
+# ============================================================
+
+def compter_prospects(agence):
+    resultat = (
+        supabase
+        .table("suivi")
+        .select("id", count="exact")
+        .eq("agence", agence)
+        .eq("type_entreprise", "🟠 Prospect")
+        .execute()
+    )
+
+    return resultat.count or 0
+
+
+# ============================================================
+# REPARTITION DU SUIVI PAR STATUT
+# ============================================================
+
+def repartition_suivi(agence):
+    resultat = (
+        supabase
+        .table("suivi")
+        .select("statut")
+        .eq("agence", agence)
+        .execute()
+    )
+
+    lignes = resultat.data or []
+
+    compteurs = {}
+
+    for ligne in lignes:
+        statut = ligne.get("statut")
+
+        if statut:
+            compteurs[statut] = compteurs.get(statut, 0) + 1
+
+    return compteurs
+
+
+# ============================================================
 # LISTER LES CV
 # ============================================================
 
@@ -207,7 +266,7 @@ def lister_cv(agence):
         .table("cv")
         .select(
             "id, candidat, metier, competences, "
-            "caces, permis, type_profil, date_creation"
+            "caces, permis, type_profil, date_creation, texte"
         )
         .eq("agence", agence)
         .order("date_creation", desc=True)
@@ -218,7 +277,7 @@ def lister_cv(agence):
 
 
 # ============================================================
-# CV POUR LE MATCHING
+# RECUPERER LES CV POUR LE MATCHING
 # ============================================================
 
 def recuperer_cvs_matching(agence):
@@ -247,7 +306,7 @@ def recuperer_postes(agence):
         .table("postes")
         .select(
             "id, entreprise, poste, competences, "
-            "caces, permis, texte"
+            "caces, permis, texte, date_creation"
         )
         .eq("agence", agence)
         .order("date_creation", desc=True)
@@ -267,9 +326,87 @@ def recuperer_poste(id_poste):
         .table("postes")
         .select(
             "id, entreprise, poste, competences, "
-            "caces, permis, texte"
+            "caces, permis, texte, date_creation"
         )
         .eq("id", id_poste)
+        .single()
+        .execute()
+    )
+
+    return resultat.data
+
+
+# ============================================================
+# AJOUTER UNE CANDIDATURE AU SUIVI
+# ============================================================
+
+def ajouter_suivi(
+    agence,
+    candidat,
+    entreprise,
+    poste,
+    statut,
+    type_entreprise,
+):
+    return enregistrer_suivi(
+        agence,
+        candidat,
+        entreprise,
+        poste,
+        statut,
+        type_entreprise,
+    )
+
+
+# ============================================================
+# LISTER LE SUIVI
+# ============================================================
+
+def lister_suivi(agence):
+    resultat = (
+        supabase
+        .table("suivi")
+        .select(
+            "id, candidat, entreprise, poste, statut, "
+            "type_entreprise, date_creation"
+        )
+        .eq("agence", agence)
+        .order("date_creation", desc=True)
+        .execute()
+    )
+
+    return resultat.data or []
+
+
+# ============================================================
+# MODIFIER LE STATUT D'UNE CANDIDATURE
+# ============================================================
+
+def modifier_statut_suivi(suivi_id, nouveau_statut):
+    resultat = (
+        supabase
+        .table("suivi")
+        .update({"statut": nouveau_statut})
+        .eq("id", suivi_id)
+        .execute()
+    )
+
+    return resultat.data or []
+
+
+# ============================================================
+# RECUPERER UN CV
+# ============================================================
+
+def recuperer_cv(id_cv):
+    resultat = (
+        supabase
+        .table("cv")
+        .select(
+            "id, candidat, metier, competences, "
+            "caces, permis, type_profil, texte"
+        )
+        .eq("id", id_cv)
         .single()
         .execute()
     )
@@ -292,7 +429,7 @@ def supprimer_cv(id_cv):
 
 
 # ============================================================
-# STATISTIQUES
+# STATISTIQUES PAR JOUR
 # ============================================================
 
 def statistiques_par_semaine(agence):
@@ -315,8 +452,8 @@ def statistiques_par_semaine(agence):
         if not date_creation:
             continue
 
-        semaine = str(date_creation)[:10]
+        jour = str(date_creation)[:10]
 
-        statistiques[semaine] = statistiques.get(semaine, 0) + 1
+        statistiques[jour] = statistiques.get(jour, 0) + 1
 
     return list(statistiques.items())
