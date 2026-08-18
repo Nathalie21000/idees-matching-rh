@@ -21,6 +21,7 @@ from database import (
     lister_suivi,
     modifier_statut_suivi,
     statistiques_par_semaine,
+    supprimer_poste,
 )
 
 from matching import calculer_score
@@ -150,6 +151,7 @@ page = st.sidebar.radio(
         "📄 Importer un CV",
         "📂 CVthèque",
         "🏢 Importer une fiche de poste",
+        "📁 Postethèque",
         "🔍 Matching",
         "📋 Suivi des candidatures",
         "📈 Statistiques",
@@ -628,6 +630,166 @@ elif page == "🏢 Importer une fiche de poste":
             ):
 
                 st.text(texte)
+
+
+# ============================================================
+# POSTETHEQUE
+# ============================================================
+
+elif page == "📁 Postethèque":
+
+    st.title("📁 Postethèque")
+
+    recherche_poste = st.text_input(
+        "🔎 Rechercher une entreprise, un poste, "
+        "une compétence..."
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        filtre_poste_intitule = st.text_input(
+            "💼 Intitulé du poste"
+        )
+
+    with col2:
+
+        filtre_poste_caces = st.text_input(
+            "🚜 CACES"
+        )
+
+    with col3:
+
+        filtre_poste_permis = st.text_input(
+            "🚗 Permis"
+        )
+
+    postes_liste = recuperer_postes(agence)
+
+    if not postes_liste:
+
+        st.info(
+            "Aucune fiche de poste enregistrée "
+            "pour cette agence."
+        )
+
+    else:
+
+        for poste_item in postes_liste:
+
+            poste_id = poste_item.get("id")
+            entreprise = poste_item.get("entreprise") or ""
+            intitule = poste_item.get("poste") or ""
+            competences = poste_item.get("competences") or ""
+            caces = poste_item.get("caces") or ""
+            permis = poste_item.get("permis") or ""
+            date_creation = (
+                poste_item.get("date_creation") or ""
+            )
+            texte_poste = poste_item.get("texte") or ""
+
+            texte_recherche_poste = (
+                f"{entreprise} "
+                f"{intitule} "
+                f"{competences} "
+                f"{caces} "
+                f"{permis} "
+                f"{texte_poste}"
+            ).lower()
+
+            if (
+                recherche_poste
+                and recherche_poste.lower()
+                not in texte_recherche_poste
+            ):
+                continue
+
+            if (
+                filtre_poste_intitule
+                and filtre_poste_intitule.lower()
+                not in intitule.lower()
+            ):
+                continue
+
+            if (
+                filtre_poste_caces
+                and filtre_poste_caces.lower()
+                not in caces.lower()
+            ):
+                continue
+
+            if (
+                filtre_poste_permis
+                and filtre_poste_permis.lower()
+                not in permis.lower()
+            ):
+                continue
+
+            with st.expander(
+                f"🏢 {entreprise} — {intitule}"
+            ):
+
+                st.write(
+                    f"**Entreprise :** {entreprise}"
+                )
+
+                st.write(
+                    f"**Intitulé du poste :** {intitule}"
+                )
+
+                st.write(
+                    f"**Compétences requises :** "
+                    f"{competences if competences else 'Non renseigné'}"
+                )
+
+                st.write(
+                    f"**CACES requis :** "
+                    f"{caces if caces else 'Aucun'}"
+                )
+
+                st.write(
+                    f"**Permis requis :** "
+                    f"{permis if permis else 'Non renseigné'}"
+                )
+
+                st.caption(
+                    f"Ajouté le {date_creation}"
+                )
+
+                if texte_poste:
+
+                    with st.expander(
+                        "Voir le texte complet de la fiche de poste"
+                    ):
+
+                        st.text(texte_poste)
+
+                st.markdown("---")
+
+                if st.button(
+                    "🗑️ Supprimer cette fiche de poste",
+                    key=f"suppr_poste_{poste_id}",
+                ):
+
+                    try:
+
+                        supprimer_poste(poste_id)
+
+                        st.success(
+                            "Fiche de poste supprimée."
+                        )
+
+                        st.rerun()
+
+                    except Exception as erreur:
+
+                        st.error(
+                            "Erreur lors de la suppression "
+                            "de la fiche de poste."
+                        )
+
+                        st.exception(erreur)
 
 
 # ============================================================
