@@ -34,14 +34,11 @@ def init_db():
 # ============================================================
 
 def get_connection():
-    """
-    Retourne la connexion Supabase.
-    """
     return supabase
 
 
 # ============================================================
-# ENREGISTREMENT D'UN CV
+# ENREGISTRER UN CV
 # ============================================================
 
 def enregistrer_cv(
@@ -67,18 +64,24 @@ def enregistrer_cv(
         "texte": texte,
     }
 
-    resultat = supabase.table("cv").insert(donnees).execute()
+    resultat = (
+        supabase
+        .table("cv")
+        .insert(donnees)
+        .execute()
+    )
 
     if not resultat.data:
         raise RuntimeError(
-            f"Supabase n'a retourné aucune donnée après l'enregistrement du CV : {resultat}"
+            "Supabase n'a retourné aucune donnée après "
+            f"l'enregistrement du CV : {resultat}"
         )
 
     return resultat
 
 
 # ============================================================
-# ENREGISTREMENT D'UNE FICHE DE POSTE
+# ENREGISTRER UNE FICHE DE POSTE
 # ============================================================
 
 def enregistrer_poste(
@@ -100,11 +103,24 @@ def enregistrer_poste(
         "texte": texte,
     }
 
-    return supabase.table("postes").insert(donnees).execute()
+    resultat = (
+        supabase
+        .table("postes")
+        .insert(donnees)
+        .execute()
+    )
+
+    if not resultat.data:
+        raise RuntimeError(
+            "Supabase n'a retourné aucune donnée après "
+            f"l'enregistrement de la fiche de poste : {resultat}"
+        )
+
+    return resultat
 
 
 # ============================================================
-# ENREGISTREMENT DU SUIVI
+# ENREGISTRER UN SUIVI
 # ============================================================
 
 def enregistrer_suivi(
@@ -124,7 +140,12 @@ def enregistrer_suivi(
         "type_entreprise": type_entreprise,
     }
 
-    return supabase.table("suivi").insert(donnees).execute()
+    return (
+        supabase
+        .table("suivi")
+        .insert(donnees)
+        .execute()
+    )
 
 
 # ============================================================
@@ -197,7 +218,7 @@ def lister_cv(agence):
 
 
 # ============================================================
-# RECUPERER LES CV POUR LE MATCHING
+# CV POUR LE MATCHING
 # ============================================================
 
 def recuperer_cvs_matching(agence):
