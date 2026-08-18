@@ -429,6 +429,20 @@ def supprimer_cv(id_cv):
 
 
 # ============================================================
+# SUPPRIMER UNE FICHE DE POSTE
+# ============================================================
+
+def supprimer_poste(id_poste):
+    return (
+        supabase
+        .table("postes")
+        .delete()
+        .eq("id", id_poste)
+        .execute()
+    )
+
+
+# ============================================================
 # STATISTIQUES PAR JOUR
 # ============================================================
 
