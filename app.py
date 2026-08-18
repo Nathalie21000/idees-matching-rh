@@ -980,5 +980,4 @@ elif page == "📈 Statistiques":
                 f"{nb} candidature(s)"
             )
 
-            st.markdown("---")       
-            
+            st.markdown("---")
