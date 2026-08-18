@@ -4,32 +4,45 @@ import streamlit as st
 
 from database import (
     init_db,
-    get_connection,
     enregistrer_cv,
     enregistrer_poste,
+    enregistrer_suivi,
     compter_cv,
     compter_postes,
     compter_suivi,
+    compter_clients,
+    compter_prospects,
+    repartition_suivi,
+    lister_cv,
+    recuperer_cvs_matching,
+    recuperer_postes,
+    recuperer_poste,
+    recuperer_cv,
+    lister_suivi,
+    modifier_statut_suivi,
     statistiques_par_semaine,
 )
+
 from matching import calculer_score
 from metiers import METIERS, detecter_metier
+
 from utils import (
     extract_text,
     generer_presentation,
 )
 
-# ----------------------------
-# CONFIGURATION GÉNÉRALE
-# ----------------------------
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
 st.set_page_config(
     page_title="ID'EES INTERIM - Assistant IA RH",
     page_icon="🧑‍💼",
-    layout="wide"
+    layout="wide",
 )
 
-# À adapter à la liste réelle des agences ID'EES INTERIM
+
 AGENCES = [
     "Alençon",
     "Avranches",
@@ -38,8 +51,8 @@ AGENCES = [
     "Le Mans",
     "Rennes",
     "Saint-Malo",
-
 ]
+
 
 STATUTS_SUIVI = [
     "Candidature envoyée",
@@ -48,60 +61,87 @@ STATUTS_SUIVI = [
     "Refusé",
 ]
 
+
 init_db()
 
 
-# ----------------------------
-# FONCTIONS D'EXTRACTION
-# ----------------------------
+# ============================================================
+# EXTRACTION
+# ============================================================
 
 def extraire_candidat(nom_fichier):
-    """
-    Déduit un nom de candidat à partir du nom du fichier PDF
-    (ex: 'jean_dupont_cv.pdf' -> 'Jean Dupont Cv').
-    """
-    nom = re.sub(r"\.pdf$", "", nom_fichier, flags=re.IGNORECASE)
-    nom = re.sub(r"[_\-]+", " ", nom)
-    nom = re.sub(r"\s+", " ", nom).strip()
+    nom = re.sub(
+        r"\.pdf$",
+        "",
+        nom_fichier,
+        flags=re.IGNORECASE,
+    )
+
+    nom = re.sub(
+        r"[_\-]+",
+        " ",
+        nom,
+    )
+
+    nom = re.sub(
+        r"\s+",
+        " ",
+        nom,
+    ).strip()
+
     return nom.title() if nom else "Candidat inconnu"
 
 
 def extraire_competences(texte):
-    """
-    Repère, parmi les mots-clés connus (metiers.py), ceux présents
-    dans le texte pour obtenir une liste de compétences détectées.
-    """
     trouve = set()
+
+    texte_min = texte.lower()
+
     for mots in METIERS.values():
         for mot in mots:
-            if mot in texte:
+            if mot.lower() in texte_min:
                 trouve.add(mot)
+
     return ", ".join(sorted(trouve))
 
 
 def extraire_caces(texte):
-    """
-    Détecte les CACES mentionnés (ex: R482, R489, R486...).
-    """
-    resultats = {m.upper() for m in re.findall(r"r4\d{2}", texte)}
+    resultats = {
+        m.upper()
+        for m in re.findall(
+            r"r4\d{2}",
+            texte,
+            flags=re.IGNORECASE,
+        )
+    }
+
     return ", ".join(sorted(resultats))
 
 
 def extraire_permis(texte):
-    """
-    Détecte les permis mentionnés (ex: permis B, permis CE...).
-    """
-    resultats = {m.upper() for m in re.findall(r"permis\s+([a-z]{1,2}\d?)", texte)}
+    resultats = {
+        m.upper()
+        for m in re.findall(
+            r"permis\s+([a-z]{1,2}\d?)",
+            texte,
+            flags=re.IGNORECASE,
+        )
+    }
+
     return ", ".join(sorted(resultats))
 
 
-# ----------------------------
-# BARRE LATÉRALE
-# ----------------------------
+# ============================================================
+# BARRE LATERALE
+# ============================================================
 
 st.sidebar.title("🧑‍💼 ID'EES INTERIM")
 
-agence = st.sidebar.selectbox("Agence", AGENCES)
+agence = st.sidebar.selectbox(
+    "Agence",
+    AGENCES,
+)
+
 
 page = st.sidebar.radio(
     "Navigation",
@@ -113,73 +153,89 @@ page = st.sidebar.radio(
         "🔍 Matching",
         "📋 Suivi des candidatures",
         "📈 Statistiques",
-        
     ],
 )
 
+
 st.sidebar.markdown("---")
-st.sidebar.caption(f"Agence sélectionnée : **{agence}**")
+
+st.sidebar.caption(
+    f"Agence sélectionnée : **{agence}**"
+)
 
 
-# ----------------------------
-# PAGE : TABLEAU DE BORD
-# ----------------------------
+# ============================================================
+# TABLEAU DE BORD
+# ============================================================
 
 if page == "📊 Tableau de bord":
 
     st.title("📊 Tableau de bord")
-    st.caption(f"Agence : {agence}")
+
+    st.caption(
+        f"Agence : {agence}"
+    )
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("CV enregistrés", compter_cv(agence))
-    col2.metric("Postes enregistrés", compter_postes(agence))
-    col3.metric("Entretiens programmés", compter_suivi(agence, "Entretien programmé"))
-    col4.metric("Recrutements", compter_suivi(agence, "Recruté"))
+
+    col1.metric(
+        "CV enregistrés",
+        compter_cv(agence),
+    )
+
+    col2.metric(
+        "Postes enregistrés",
+        compter_postes(agence),
+    )
+
+    col3.metric(
+        "Entretiens programmés",
+        compter_suivi(
+            agence,
+            "Entretien programmé",
+        ),
+    )
+
+    col4.metric(
+        "Recrutements",
+        compter_suivi(
+            agence,
+            "Recruté",
+        ),
+    )
 
     st.markdown("---")
 
     col5, col6 = st.columns(2)
 
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT COUNT(*) FROM suivi WHERE agence=? AND type_entreprise=?",
-        (agence, "🟢 Client"),
+    col5.metric(
+        "🟢 CV envoyés à des clients",
+        compter_clients(agence),
     )
-    nb_clients = cursor.fetchone()[0]
 
-    cursor.execute(
-        "SELECT COUNT(*) FROM suivi WHERE agence=? AND type_entreprise=?",
-        (agence, "🟠 Prospect"),
+    col6.metric(
+        "🟠 CV envoyés à des prospects",
+        compter_prospects(agence),
     )
-    nb_prospects = cursor.fetchone()[0]
 
-    conn.close()
-
-    col5.metric("🟢 CV envoyés à des clients", nb_clients)
-    col6.metric("🟠 CV envoyés à des prospects", nb_prospects)
-
-    st.subheader("Répartition des candidatures par statut")
-
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT statut, COUNT(*) FROM suivi WHERE agence=? GROUP BY statut",
-        (agence,),
+    st.subheader(
+        "Répartition des candidatures par statut"
     )
-    lignes = cursor.fetchall()
-    conn.close()
+
+    lignes = repartition_suivi(agence)
 
     if lignes:
-        st.bar_chart({statut: nb for statut, nb in lignes})
+        st.bar_chart(lignes)
+
     else:
-        st.info("Aucune candidature suivie pour le moment.")
+        st.info(
+            "Aucune candidature suivie pour le moment."
+        )
 
 
-# ----------------------------
-# PAGE : IMPORT CV
-# ----------------------------
+# ============================================================
+# IMPORT CV
+# ============================================================
 
 elif page == "📄 Importer un CV":
 
@@ -187,7 +243,7 @@ elif page == "📄 Importer un CV":
 
     fichier = st.file_uploader(
         "Sélectionnez un CV (PDF)",
-        type=["pdf"]
+        type=["pdf"],
     )
 
     if fichier is not None:
@@ -195,51 +251,72 @@ elif page == "📄 Importer un CV":
         texte = extract_text(fichier)
 
         if not texte:
+
             st.error(
-                "Impossible d'extraire le texte de ce PDF (fichier scanné ?)."
+                "Impossible d'extraire le texte de ce PDF "
+                "(fichier scanné ?)."
             )
 
         else:
-            candidat_detecte = extraire_candidat(fichier.name)
-            metier_detecte = detecter_metier(texte)
-            competences_detectees = extraire_competences(texte)
-            caces_detectes = extraire_caces(texte)
-            permis_detectes = extraire_permis(texte)
+
+            candidat_detecte = extraire_candidat(
+                fichier.name
+            )
+
+            metier_detecte = detecter_metier(
+                texte
+            )
+
+            competences_detectees = extraire_competences(
+                texte
+            )
+
+            caces_detectes = extraire_caces(
+                texte
+            )
+
+            permis_detectes = extraire_permis(
+                texte
+            )
 
             st.success(
-                "CV analysé avec succès. Vérifiez les informations avant d'enregistrer."
+                "CV analysé avec succès. "
+                "Vérifiez les informations avant d'enregistrer."
             )
 
             with st.form("form_cv"):
 
                 candidat = st.text_input(
                     "Nom du candidat",
-                    value=candidat_detecte
+                    value=candidat_detecte,
                 )
 
                 metier = st.text_input(
                     "Métier détecté",
-                    value=metier_detecte
+                    value=metier_detecte,
                 )
 
                 competences = st.text_area(
                     "Compétences détectées",
-                    value=competences_detectees
+                    value=competences_detectees,
                 )
 
                 caces = st.text_input(
                     "CACES détectés",
-                    value=caces_detectes
+                    value=caces_detectes,
                 )
 
                 permis = st.text_input(
                     "Permis détectés",
-                    value=permis_detectes
+                    value=permis_detectes,
                 )
 
                 type_profil = st.radio(
                     "Type de profil",
-                    ["🟢 Intérimaire", "🟡 Candidat"],
+                    [
+                        "🟢 Intérimaire",
+                        "🟡 Candidat",
+                    ],
                     horizontal=True,
                 )
 
@@ -249,30 +326,46 @@ elif page == "📄 Importer un CV":
 
             if valider:
 
-                enregistrer_cv(
-                    agence,
-                    fichier.name,
-                    candidat,
-                    metier,
-                    competences,
-                    caces,
-                    permis,
-                    type_profil,
-                    texte,
-                )
+                try:
 
-                st.success(
-                    f"CV de {candidat} enregistré pour {agence}."
-                )
+                    enregistrer_cv(
+                        agence,
+                        fichier.name,
+                        candidat,
+                        metier,
+                        competences,
+                        caces,
+                        permis,
+                        type_profil,
+                        texte,
+                    )
 
-                st.rerun()
+                    st.success(
+                        f"CV de {candidat} enregistré "
+                        f"pour {agence}."
+                    )
 
-            with st.expander("Voir le texte extrait du CV"):
+                    st.rerun()
+
+                except Exception as erreur:
+
+                    st.error(
+                        "Erreur lors de l'enregistrement "
+                        "du CV dans Supabase."
+                    )
+
+                    st.exception(erreur)
+
+            with st.expander(
+                "Voir le texte extrait du CV"
+            ):
+
                 st.text(texte)
 
-# ----------------------------
-# PAGE : CVTHÈQUE
-# ----------------------------
+
+# ============================================================
+# CVTHEQUE
+# ============================================================
 
 elif page == "📂 CVthèque":
 
@@ -285,362 +378,607 @@ elif page == "📂 CVthèque":
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        filtre_metier = st.text_input("👷 Métier")
+
+        filtre_metier = st.text_input(
+            "👷 Métier"
+        )
 
     with col2:
-        filtre_caces = st.text_input("🚜 CACES")
+
+        filtre_caces = st.text_input(
+            "🚜 CACES"
+        )
 
     with col3:
-        filtre_permis = st.text_input("🚗 Permis")
 
-    conn = get_connection()
-    cursor = conn.cursor()
+        filtre_permis = st.text_input(
+            "🚗 Permis"
+        )
 
-    cursor.execute("""
-        SELECT
-            id,
-            candidat,
-            metier,
-            competences,
-            caces,
-            permis,
-            type_profil,
-            date_creation
-        FROM cv
-        WHERE agence=?
-        ORDER BY date_creation DESC
-    """, (agence,))
-
-    cvs = cursor.fetchall()
-    conn.close()
+    cvs = lister_cv(agence)
 
     if not cvs:
-        st.info("Aucun CV enregistré pour cette agence.")
+
+        st.info(
+            "Aucun CV enregistré pour cette agence."
+        )
 
     else:
 
         for cv in cvs:
 
-            (
-                cv_id,
-                candidat,
-                metier,
-                competences,
-                caces,
-                permis,
-                type_profil,
-                date_creation,
-            ) = cv
+            cv_id = cv.get("id")
+            candidat = cv.get("candidat") or ""
+            metier = cv.get("metier") or ""
+            competences = cv.get("competences") or ""
+            caces = cv.get("caces") or ""
+            permis = cv.get("permis") or ""
+            type_profil = cv.get("type_profil") or ""
+            date_creation = cv.get("date_creation") or ""
+            texte = cv.get("texte") or ""
 
             texte_recherche = (
-                f"{candidat} {metier} {competences} {caces} {permis}"
+                f"{candidat} "
+                f"{metier} "
+                f"{competences} "
+                f"{caces} "
+                f"{permis} "
+                f"{texte}"
             ).lower()
 
-            if recherche and recherche.lower() not in texte_recherche:
+            if (
+                recherche
+                and recherche.lower()
+                not in texte_recherche
+            ):
                 continue
 
-            if filtre_metier and filtre_metier.lower() not in metier.lower():
+            if (
+                filtre_metier
+                and filtre_metier.lower()
+                not in metier.lower()
+            ):
                 continue
 
-            if filtre_caces and filtre_caces.lower() not in caces.lower():
+            if (
+                filtre_caces
+                and filtre_caces.lower()
+                not in caces.lower()
+            ):
                 continue
 
-            if filtre_permis and filtre_permis.lower() not in permis.lower():
-                continue              
+            if (
+                filtre_permis
+                and filtre_permis.lower()
+                not in permis.lower()
+            ):
+                continue
 
-            with st.expander(f"👤 {candidat} - {metier}"):
+            with st.expander(
+                f"👤 {candidat} - {metier}"
+            ):
 
-                st.write(f"**Métier :** {metier}")
+                st.write(
+                    f"**Métier :** {metier}"
+                )
 
-                st.write(f"**Compétences :** {competences}")
+                st.write(
+                    f"**Compétences :** {competences}"
+                )
 
-                st.write(f"**CACES :** {caces if caces else 'Aucun'}")
+                st.write(
+                    f"**CACES :** "
+                    f"{caces if caces else 'Aucun'}"
+                )
 
-                st.write(f"**Permis :** {permis if permis else 'Non renseigné'}")
+                st.write(
+                    f"**Permis :** "
+                    f"{permis if permis else 'Non renseigné'}"
+                )
 
                 if type_profil == "🟢 Intérimaire":
-                    st.write("**Type de profil :** 🟢 Intérimaire")
-                else:
-                    st.write("**Type de profil :** 🟡 Candidat")
 
-                st.caption(f"Ajouté le {date_creation}")
-                
-# ----------------------------
-# PAGE : IMPORT FICHE DE POSTE
-# ----------------------------
+                    st.write(
+                        "**Type de profil :** "
+                        "🟢 Intérimaire"
+                    )
+
+                else:
+
+                    st.write(
+                        "**Type de profil :** "
+                        "🟡 Candidat"
+                    )
+
+                st.caption(
+                    f"Ajouté le {date_creation}"
+                )
+
+                if texte:
+
+                    with st.expander(
+                        "Voir le texte complet du CV"
+                    ):
+
+                        st.text(texte)
+
+
+# ============================================================
+# IMPORT FICHE DE POSTE
+# ============================================================
 
 elif page == "🏢 Importer une fiche de poste":
 
     st.title("🏢 Importer une fiche de poste")
 
-    fichier = st.file_uploader("Sélectionnez une fiche de poste (PDF)", type=["pdf"])
+    fichier = st.file_uploader(
+        "Sélectionnez une fiche de poste (PDF)",
+        type=["pdf"],
+    )
 
     if fichier is not None:
 
         texte = extract_text(fichier)
 
         if not texte:
-            st.error("Impossible d'extraire le texte de ce PDF (fichier scanné ?).")
-        else:
-            metier_detecte = detecter_metier(texte)
-            competences_detectees = extraire_competences(texte)
-            caces_detectes = extraire_caces(texte)
-            permis_detectes = extraire_permis(texte)
 
-            st.success("Fiche de poste analysée avec succès. Vérifiez les informations avant d'enregistrer.")
+            st.error(
+                "Impossible d'extraire le texte de cette fiche "
+                "de poste (fichier scanné ?)."
+            )
+
+        else:
+
+            metier_detecte = detecter_metier(
+                texte
+            )
+
+            competences_detectees = extraire_competences(
+                texte
+            )
+
+            caces_detectes = extraire_caces(
+                texte
+            )
+
+            permis_detectes = extraire_permis(
+                texte
+            )
+
+            st.success(
+                "Fiche de poste analysée avec succès. "
+                "Vérifiez les informations avant d'enregistrer."
+            )
 
             with st.form("form_poste"):
-                entreprise = st.text_input("Entreprise cliente")
+
+                entreprise = st.text_input(
+                    "Entreprise cliente"
+                )
+
                 poste = st.text_input(
                     "Intitulé du poste",
-                    value=metier_detecte if metier_detecte != "Non détecté" else "",
+                    value=(
+                        metier_detecte
+                        if metier_detecte != "Non détecté"
+                        else ""
+                    ),
                 )
-                competences = st.text_area("Compétences requises", value=competences_detectees)
-                caces = st.text_input("CACES requis", value=caces_detectes)
-                permis = st.text_input("Permis requis", value=permis_detectes)
 
-                valider = st.form_submit_button("Enregistrer cette fiche de poste")
+                competences = st.text_area(
+                    "Compétences requises",
+                    value=competences_detectees,
+                )
+
+                caces = st.text_input(
+                    "CACES requis",
+                    value=caces_detectes,
+                )
+
+                permis = st.text_input(
+                    "Permis requis",
+                    value=permis_detectes,
+                )
+
+                valider = st.form_submit_button(
+                    "Enregistrer cette fiche de poste"
+                )
 
             if valider:
-                if not entreprise or not poste:
-                    st.error("Merci de renseigner au moins l'entreprise et l'intitulé du poste.")
-                else:
-                    enregistrer_poste(
-                        agence,
-                        entreprise,
-                        poste,
-                        competences,
-                        caces,
-                        permis,
-                        texte,
-                    )
-                    st.success(f"Fiche de poste « {poste} » enregistrée pour {entreprise}.")
-                    st.rerun()
 
-            with st.expander("Voir le texte extrait de la fiche de poste"):
+                if not entreprise or not poste:
+
+                    st.error(
+                        "Merci de renseigner au moins "
+                        "l'entreprise et l'intitulé du poste."
+                    )
+
+                else:
+
+                    try:
+
+                        enregistrer_poste(
+                            agence,
+                            entreprise,
+                            poste,
+                            competences,
+                            caces,
+                            permis,
+                            texte,
+                        )
+
+                        st.success(
+                            f"Fiche de poste « {poste} » "
+                            f"enregistrée pour {entreprise}."
+                        )
+
+                        st.rerun()
+
+                    except Exception as erreur:
+
+                        st.error(
+                            "Erreur lors de l'enregistrement "
+                            "de la fiche de poste."
+                        )
+
+                        st.exception(erreur)
+
+            with st.expander(
+                "Voir le texte extrait de la fiche de poste"
+            ):
+
                 st.text(texte)
 
 
-# ----------------------------
-# PAGE : MATCHING
-# ----------------------------
+# ============================================================
+# MATCHING
+# ============================================================
 
 elif page == "🔍 Matching":
 
-    st.title("🔍 Matching CV / Fiches de poste")
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT id, poste, entreprise FROM postes WHERE agence=? ORDER BY date_creation DESC",
-        (agence,),
+    st.title(
+        "🔍 Matching CV / Fiches de poste"
     )
-    postes = cursor.fetchall()
 
-    cursor.execute(
-        "SELECT id, candidat, texte FROM cv WHERE agence=? ORDER BY date_creation DESC",
-        (agence,),
-    )
-    cvs = cursor.fetchall()
+    postes = recuperer_postes(agence)
 
-    conn.close()
+    cvs = recuperer_cvs_matching(agence)
 
     if not postes:
-        st.info("Aucune fiche de poste enregistrée pour cette agence.")
+
+        st.info(
+            "Aucune fiche de poste enregistrée "
+            "pour cette agence."
+        )
+
     elif not cvs:
-        st.info("Aucun CV enregistré pour cette agence.")
+
+        st.info(
+            "Aucun CV enregistré pour cette agence."
+        )
+
     else:
-        options_postes = {f"{p[1]} — {p[2]}": p[0] for p in postes}
-        choix_poste = st.selectbox("Choisissez une fiche de poste", list(options_postes.keys()))
+
+        options_postes = {
+            f"{p['poste']} — {p['entreprise']}": p["id"]
+            for p in postes
+        }
+
+        choix_poste = st.selectbox(
+            "Choisissez une fiche de poste",
+            list(options_postes.keys()),
+        )
+
         poste_id = options_postes[choix_poste]
 
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT texte, poste, entreprise FROM postes WHERE id=?", (poste_id,))
-        poste_texte, poste_nom, entreprise_nom = cursor.fetchone()
-        conn.close()
+        poste = recuperer_poste(poste_id)
 
-        resultats = []
-        for cv_id, candidat, cv_texte in cvs:
-            score, mots_communs, metier_cv, _ = calculer_score(cv_texte, poste_texte)
-            resultats.append({
-                "cv_id": cv_id,
-                "candidat": candidat,
-                "metier": metier_cv,
-                "score": score,
-                "mots_communs": mots_communs,
-            })
+        if not poste:
 
-        resultats.sort(key=lambda r: r["score"], reverse=True)
+            st.error(
+                "Impossible de récupérer cette fiche de poste."
+            )
 
-        st.subheader(f"Résultats pour : {poste_nom} — {entreprise_nom}")
+        else:
 
-        for r in resultats:
-            with st.expander(f"{r['candidat']} — {r['score']}% de compatibilité ({r['metier']})"):
-                st.progress(min(r["score"], 100) / 100)
+            poste_texte = poste.get("texte") or ""
+            poste_nom = poste.get("poste") or ""
+            entreprise_nom = poste.get("entreprise") or ""
 
-                if r["mots_communs"]:
-                    st.caption("Mots-clés en commun : " + ", ".join(r["mots_communs"][:20]))
+            resultats = []
 
-                statut = st.selectbox(
-                    "Statut de la candidature",
-                    STATUTS_SUIVI,
-                    key=f"statut_{r['cv_id']}",
+            for cv in cvs:
+
+                cv_id = cv.get("id")
+                candidat = cv.get("candidat") or ""
+                cv_texte = cv.get("texte") or ""
+
+                score, mots_communs, metier_cv, _ = (
+                    calculer_score(
+                        cv_texte,
+                        poste_texte,
+                    )
                 )
 
-                type_entreprise = st.radio(
-                    "Type d'entreprise",
-                    ["🟢 Client", "🟠 Prospect"],
-                    horizontal=True,
-                    key=f"type_entreprise_{r['cv_id']}",
+                resultats.append(
+                    {
+                        "cv_id": cv_id,
+                        "candidat": candidat,
+                        "metier": metier_cv,
+                        "score": score,
+                        "mots_communs": mots_communs,
+                    }
                 )
 
-                if st.button("Ajouter au suivi", key=f"suivi_{r['cv_id']}"):
-                    conn = get_connection()
-                    cursor = conn.cursor()
+            resultats.sort(
+                key=lambda r: r["score"],
+                reverse=True,
+            )
 
-                    cursor.execute(
-                        """
-                        INSERT INTO suivi(
-                            agence,
-                            candidat,
-                            entreprise,
-                            poste,
-                            statut,
-                            type_entreprise,
-                            date_creation
+            st.subheader(
+                f"Résultats pour : "
+                f"{poste_nom} — {entreprise_nom}"
+            )
+
+            for r in resultats:
+
+                with st.expander(
+                    f"{r['candidat']} — "
+                    f"{r['score']}% de compatibilité "
+                    f"({r['metier']})"
+                ):
+
+                    st.progress(
+                        min(r["score"], 100) / 100
+                    )
+
+                    if r["mots_communs"]:
+
+                        st.caption(
+                            "Mots-clés en commun : "
+                            + ", ".join(
+                                r["mots_communs"][:20]
+                            )
                         )
-                        VALUES(?,?,?,?,?,?,?)
-                        """,
-                        (
-                            agence,
-                            r["candidat"],
-                            entreprise_nom,
-                            poste_nom,
-                            statut,
-                            type_entreprise,
-                            __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+
+                    statut = st.selectbox(
+                        "Statut de la candidature",
+                        STATUTS_SUIVI,
+                        key=f"statut_{r['cv_id']}",
+                    )
+
+                    type_entreprise = st.radio(
+                        "Type d'entreprise",
+                        [
+                            "🟢 Client",
+                            "🟠 Prospect",
+                        ],
+                        horizontal=True,
+                        key=(
+                            f"type_entreprise_"
+                            f"{r['cv_id']}"
                         ),
                     )
 
-                    conn.commit()
-                    conn.close()
+                    if st.button(
+                        "Ajouter au suivi",
+                        key=f"suivi_{r['cv_id']}",
+                    ):
 
-                    st.success("Candidature ajoutée au suivi.")
+                        try:
 
-                st.markdown("---")
+                            enregistrer_suivi(
+                                agence,
+                                r["candidat"],
+                                entreprise_nom,
+                                poste_nom,
+                                statut,
+                                type_entreprise,
+                            )
 
-                if st.button(
-                    "📧 Générer une présentation",
-                    key=f"presentation_{r['cv_id']}"
-                ):
+                            st.success(
+                                "Candidature ajoutée au suivi."
+                            )
 
-                    conn = get_connection()
-                    cursor = conn.cursor()
+                            st.rerun()
 
-                    cursor.execute("""
-                        SELECT
-                            candidat,
-                            metier,
-                            competences,
-                            caces,
-                            permis
-                        FROM cv
-                        WHERE id=?
-                    """, (r["cv_id"],))
+                        except Exception as erreur:
 
-                    candidat, metier, competences, caces, permis = cursor.fetchone()
+                            st.error(
+                                "Erreur lors de l'ajout "
+                                "au suivi."
+                            )
 
-                    conn.close()
+                            st.exception(erreur)
 
-                    texte = generer_presentation(
-                        candidat,
-                        metier,
-                        competences,
-                        caces,
-                        permis,
-                        entreprise_nom,
-                        agence,
-                    )
+                    st.markdown("---")
 
-                    st.text_area(
-                        "Présentation prête à copier",
-                        value=texte,
-                        height=300,
-                        key=f"texte_{r['cv_id']}"
-                    )
-    
-# ----------------------------
-# PAGE : SUIVI DES CANDIDATURES
-# ----------------------------
+                    if st.button(
+                        "📧 Générer une présentation",
+                        key=(
+                            f"presentation_"
+                            f"{r['cv_id']}"
+                        ),
+                    ):
+
+                        cv_complet = recuperer_cv(
+                            r["cv_id"]
+                        )
+
+                        if cv_complet:
+
+                            candidat = (
+                                cv_complet.get("candidat")
+                                or ""
+                            )
+
+                            metier = (
+                                cv_complet.get("metier")
+                                or ""
+                            )
+
+                            competences = (
+                                cv_complet.get(
+                                    "competences"
+                                )
+                                or ""
+                            )
+
+                            caces = (
+                                cv_complet.get("caces")
+                                or ""
+                            )
+
+                            permis = (
+                                cv_complet.get("permis")
+                                or ""
+                            )
+
+                            texte = generer_presentation(
+                                candidat,
+                                metier,
+                                competences,
+                                caces,
+                                permis,
+                                entreprise_nom,
+                                agence,
+                            )
+
+                            st.text_area(
+                                "Présentation prête à copier",
+                                value=texte,
+                                height=300,
+                                key=(
+                                    f"texte_"
+                                    f"{r['cv_id']}"
+                                ),
+                            )
+
+
+# ============================================================
+# SUIVI DES CANDIDATURES
+# ============================================================
 
 elif page == "📋 Suivi des candidatures":
 
-    st.title("📋 Suivi des candidatures")
-
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT id, candidat, entreprise, poste, statut, type_entreprise, date_creation "
-        "FROM suivi WHERE agence=? ORDER BY date_creation DESC",
-        (agence,),
+    st.title(
+        "📋 Suivi des candidatures"
     )
-    lignes = cursor.fetchall()
-    conn.close()
+
+    lignes = lister_suivi(agence)
 
     if not lignes:
-        st.info("Aucune candidature suivie pour le moment.")
+
+        st.info(
+            "Aucune candidature suivie pour le moment."
+        )
+
     else:
-        for suivi_id, candidat, entreprise, poste, statut, type_entreprise, date_creation in lignes:
-            col1, col2 = st.columns([4, 2])
+
+        for ligne in lignes:
+
+            suivi_id = ligne.get("id")
+            candidat = ligne.get("candidat") or ""
+            entreprise = ligne.get("entreprise") or ""
+            poste = ligne.get("poste") or ""
+            statut = ligne.get("statut") or ""
+            type_entreprise = (
+                ligne.get("type_entreprise") or ""
+            )
+            date_creation = (
+                ligne.get("date_creation") or ""
+            )
+
+            col1, col2 = st.columns(
+                [4, 2]
+            )
 
             with col1:
-                st.write(f"**{candidat}** → {poste} chez {entreprise}")
+
+                st.write(
+                    f"**{candidat}** → "
+                    f"{poste} chez {entreprise}"
+                )
 
                 if type_entreprise == "🟢 Client":
+
                     st.caption("🟢 Client")
+
                 elif type_entreprise == "🟠 Prospect":
+
                     st.caption("🟠 Prospect")
 
-                st.caption(f"Ajouté le {date_creation}")
+                st.caption(
+                    f"Ajouté le {date_creation}"
+                )
 
             with col2:
+
                 nouveau_statut = st.selectbox(
                     "Statut",
                     STATUTS_SUIVI,
-                    index=STATUTS_SUIVI.index(statut) if statut in STATUTS_SUIVI else 0,
+                    index=(
+                        STATUTS_SUIVI.index(statut)
+                        if statut in STATUTS_SUIVI
+                        else 0
+                    ),
                     key=f"maj_statut_{suivi_id}",
                     label_visibility="collapsed",
                 )
-                if nouveau_statut != statut:
-                    conn = get_connection()
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "UPDATE suivi SET statut=? WHERE id=?",
-                        (nouveau_statut, suivi_id),
-                    )
-                    conn.commit()
-                    conn.close()
-                    st.rerun()
 
-# ----------------------------
-# PAGE : STATISTIQUES
-# ----------------------------
+                if nouveau_statut != statut:
+
+                    try:
+
+                        modifier_statut_suivi(
+                            suivi_id,
+                            nouveau_statut,
+                        )
+
+                        st.rerun()
+
+                    except Exception as erreur:
+
+                        st.error(
+                            "Erreur lors de la modification "
+                            "du statut."
+                        )
+
+                        st.exception(erreur)
+
+
+# ============================================================
+# STATISTIQUES
+# ============================================================
 
 elif page == "📈 Statistiques":
 
-    st.title("📈 Statistiques de l'agence")
+    st.title(
+        "📈 Statistiques de l'agence"
+    )
 
-    st.subheader("Activité par semaine")
+    st.subheader(
+        "Activité par semaine"
+    )
 
-    stats = statistiques_par_semaine(agence)
+    stats = statistiques_par_semaine(
+        agence
+    )
 
     if not stats:
-        st.info("Aucune donnée disponible.")
+
+        st.info(
+            "Aucune donnée disponible."
+        )
+
     else:
 
         for semaine, nb in stats:
 
-            st.write(f"📅 **{semaine}** : {nb} candidature(s)")            
-            st.markdown("---")
+            st.write(
+                f"📅 **{semaine}** : "
+                f"{nb} candidature(s)"
+            )
+
+            st.markdown("---")       
+            
