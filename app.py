@@ -31,7 +31,6 @@ from metiers import (
     detecter_metier,
     extraire_competences_pro,
     extraire_taches,
-    extraire_taches_par_lignes,
     detecter_vip_sir,
     analyser_fiche_poste,
 )
@@ -76,7 +75,7 @@ init_db()
 
 
 # ============================================================
-# EXTRACTION DU NOM DU CANDIDAT
+# EXTRACTION CANDIDAT
 # ============================================================
 
 def extraire_candidat(nom_fichier):
@@ -85,9 +84,16 @@ def extraire_candidat(nom_fichier):
     """
 
     nom = re.sub(
-        r"\.(pdf|docx)$",
+        r"\.pdf$",
         "",
         nom_fichier,
+        flags=re.IGNORECASE,
+    )
+
+    nom = re.sub(
+        r"\.docx$",
+        "",
+        nom,
         flags=re.IGNORECASE,
     )
 
@@ -107,12 +113,12 @@ def extraire_candidat(nom_fichier):
 
 
 # ============================================================
-# EXTRACTION DES COMPETENCES
+# EXTRACTION COMPETENCES
 # ============================================================
 
 def extraire_competences(texte):
     """
-    Combine les mots-clés métiers et les compétences
+    Combine les mots-clés métiers avec les compétences
     professionnelles génériques.
     """
 
@@ -121,9 +127,11 @@ def extraire_competences(texte):
     texte_min = texte.lower()
 
     for mots in METIERS.values():
+
         for mot in mots:
 
             if mot.lower() in texte_min:
+
                 trouve.add(mot)
 
     for competence in extraire_competences_pro(texte):
@@ -176,41 +184,13 @@ def extraire_permis(texte):
 
 
 # ============================================================
-# EXTRACTION DES TACHES D'UN CV
-# ============================================================
-
-def extraire_taches_cv(texte):
-
-    taches = set()
-
-    # 1. Tâches connues dans metiers.py
-    for tache in extraire_taches(texte):
-
-        taches.add(tache)
-
-    # 2. Lignes commençant par un verbe d'action
-    taches_par_rubrique = extraire_taches_par_lignes(
-        texte
-    )
-
-    for liste_taches in taches_par_rubrique.values():
-
-        for tache in liste_taches:
-
-            taches.add(tache)
-
-    return ", ".join(
-        sorted(taches)
-    )
-
-
-# ============================================================
 # BARRE LATERALE
 # ============================================================
 
 st.sidebar.title(
     "🧑‍💼 ID'EES INTERIM"
 )
+
 
 agence = st.sidebar.selectbox(
     "Agence",
@@ -234,6 +214,7 @@ page = st.sidebar.radio(
 
 
 st.sidebar.markdown("---")
+
 
 st.sidebar.caption(
     f"Agence sélectionnée : **{agence}**"
@@ -362,8 +343,10 @@ elif page == "📄 Importer un CV":
                 texte
             )
 
-            taches_detectees = extraire_taches_cv(
-                texte
+            taches_detectees = ", ".join(
+                extraire_taches(
+                    texte
+                )
             )
 
             caces_detectes = extraire_caces(
@@ -379,7 +362,9 @@ elif page == "📄 Importer un CV":
                 "Vérifiez les informations avant d'enregistrer."
             )
 
-            with st.form("form_cv"):
+            with st.form(
+                "form_cv"
+            ):
 
                 candidat = st.text_input(
                     "Nom du candidat",
@@ -400,9 +385,7 @@ elif page == "📄 Importer un CV":
                     "Tâches / missions déjà réalisées",
                     value=taches_detectees,
                     help=(
-                        "Les tâches sont recherchées dans les "
-                        "missions connues et dans les lignes "
-                        "commençant par des verbes d'action. "
+                        "Détectées automatiquement dans le CV. "
                         "Vous pouvez corriger ou compléter."
                     ),
                 )
@@ -522,22 +505,50 @@ elif page == "📂 CVthèque":
 
         for cv in cvs:
 
-            cv_id = cv.get("id")
-            candidat = cv.get("candidat") or ""
-            metier = cv.get("metier") or ""
-            competences = cv.get("competences") or ""
-            taches = cv.get("taches") or ""
-            caces = cv.get("caces") or ""
-            permis = cv.get("permis") or ""
-            type_profil = cv.get("type_profil") or ""
-            date_creation = cv.get("date_creation") or ""
-            texte = cv.get("texte") or ""
+            cv_id = cv.get(
+                "id"
+            )
+
+            candidat = cv.get(
+                "candidat"
+            ) or ""
+
+            metier = cv.get(
+                "metier"
+            ) or ""
+
+            competences = cv.get(
+                "competences"
+            ) or ""
+
+            taches = cv.get(
+                "taches"
+            ) or ""
+
+            caces = cv.get(
+                "caces"
+            ) or ""
+
+            permis = cv.get(
+                "permis"
+            ) or ""
+
+            type_profil = cv.get(
+                "type_profil"
+            ) or ""
+
+            date_creation = cv.get(
+                "date_creation"
+            ) or ""
+
+            texte = cv.get(
+                "texte"
+            ) or ""
 
             texte_recherche = (
                 f"{candidat} "
                 f"{metier} "
                 f"{competences} "
-                f"{taches} "
                 f"{caces} "
                 f"{permis} "
                 f"{texte}"
@@ -584,17 +595,17 @@ elif page == "📂 CVthèque":
                 )
 
                 st.write(
-                    "**Tâches déjà réalisées :** "
+                    f"**Tâches déjà réalisées :** "
                     f"{taches if taches else 'Non renseigné'}"
                 )
 
                 st.write(
-                    "**CACES :** "
+                    f"**CACES :** "
                     f"{caces if caces else 'Aucun'}"
                 )
 
                 st.write(
-                    "**Permis :** "
+                    f"**Permis :** "
                     f"{permis if permis else 'Non renseigné'}"
                 )
 
@@ -660,41 +671,95 @@ elif page == "🏢 Importer une fiche de poste":
 
         else:
 
-            analyse = analyser_fiche_poste(
+            # ==================================================
+            # NOUVELLE ANALYSE STRUCTUREE
+            # ==================================================
+
+            analyse_poste = analyser_fiche_poste(
                 texte
             )
 
+            # --------------------------------------------------
+            # ENTREPRISE
+            # --------------------------------------------------
+
             entreprise_detectee = (
-                analyse.get("entreprise")
+                analyse_poste.get(
+                    "entreprise"
+                )
                 or ""
             )
 
-            poste_detecte = (
-                analyse.get("intitule")
+            # --------------------------------------------------
+            # INTITULE
+            # --------------------------------------------------
+
+            intitule_extrait = (
+                analyse_poste.get(
+                    "intitule"
+                )
                 or ""
             )
 
-            competences_detectees = (
-                analyse.get("competences")
+            # Si l'intitulé structuré n'a pas été trouvé,
+            # on utilise le métier détecté en secours.
+
+            if not intitule_extrait:
+
+                intitule_extrait = detecter_metier(
+                    texte
+                )
+
+            if intitule_extrait == "Non détecté":
+
+                intitule_extrait = ""
+
+            # --------------------------------------------------
+            # TACHES
+            # --------------------------------------------------
+
+            taches_extraites = (
+                analyse_poste.get(
+                    "taches"
+                )
                 or ""
             )
 
-            taches_detectees = (
-                analyse.get("taches")
-                or ""
+            # --------------------------------------------------
+            # COMPETENCES
+            # --------------------------------------------------
+
+            competences_detectees = extraire_competences(
+                texte
             )
 
-            caces_detectes = (
-                analyse.get("conduite_engins")
-                or ""
+            # --------------------------------------------------
+            # CACES
+            # --------------------------------------------------
+
+            caces_detectes = extraire_caces(
+                texte
             )
+
+            # --------------------------------------------------
+            # PERMIS
+            # --------------------------------------------------
 
             permis_detectes = extraire_permis(
                 texte
             )
 
-            vip_sir_detecte = detecter_vip_sir(
-                texte
+            # --------------------------------------------------
+            # VIP / SIR
+            # --------------------------------------------------
+
+            vip_sir_detecte = (
+                analyse_poste.get(
+                    "vip_sir"
+                )
+                or detecter_vip_sir(
+                    texte
+                )
             )
 
             st.success(
@@ -702,7 +767,59 @@ elif page == "🏢 Importer une fiche de poste":
                 "Vérifiez les informations avant d'enregistrer."
             )
 
-            with st.form("form_poste"):
+            # ==================================================
+            # APERCU DES INFORMATIONS DETECTEES
+            # ==================================================
+
+            col_a, col_b = st.columns(2)
+
+            with col_a:
+
+                st.caption(
+                    "Entreprise détectée"
+                )
+
+                st.write(
+                    entreprise_detectee
+                    if entreprise_detectee
+                    else "Non détectée"
+                )
+
+            with col_b:
+
+                st.caption(
+                    "Intitulé détecté"
+                )
+
+                st.write(
+                    intitule_extrait
+                    if intitule_extrait
+                    else "Non détecté"
+                )
+
+            if taches_extraites:
+
+                st.info(
+                    "La rubrique « Liste des tâches à proposer » "
+                    "a été détectée et sera reprise dans "
+                    "« Tâches à réaliser »."
+                )
+
+            else:
+
+                st.warning(
+                    "La rubrique « Liste des tâches à proposer » "
+                    "n'a pas été détectée automatiquement. "
+                    "Vous pourrez renseigner les tâches manuellement."
+                )
+
+            # ==================================================
+            # FORMULAIRE
+            # ==================================================
+
+            with st.form(
+                "form_poste"
+            ):
 
                 entreprise = st.text_input(
                     "Entreprise cliente",
@@ -711,7 +828,7 @@ elif page == "🏢 Importer une fiche de poste":
 
                 poste = st.text_input(
                     "Intitulé du poste",
-                    value=poste_detecte,
+                    value=intitule_extrait,
                 )
 
                 competences = st.text_area(
@@ -721,11 +838,12 @@ elif page == "🏢 Importer une fiche de poste":
 
                 taches = st.text_area(
                     "Tâches à réaliser",
-                    value=taches_detectees,
+                    value=taches_extraites,
                     help=(
-                        "Les tâches sont extraites en priorité "
-                        "depuis la rubrique dédiée de la fiche "
-                        "de poste. Vous pouvez corriger ou compléter."
+                        "Le contenu de la rubrique "
+                        "« Liste des tâches à proposer » "
+                        "est repris automatiquement ici. "
+                        "Vous pouvez corriger ou compléter."
                     ),
                 )
 
@@ -739,35 +857,41 @@ elif page == "🏢 Importer une fiche de poste":
                     value=permis_detectes,
                 )
 
+                options_vip_sir = [
+                    "",
+                    "VIP",
+                    "SIR",
+                    "VIP + SIR",
+                ]
+
+                if vip_sir_detecte in options_vip_sir:
+
+                    index_vip_sir = options_vip_sir.index(
+                        vip_sir_detecte
+                    )
+
+                else:
+
+                    index_vip_sir = 0
+
                 vip_sir = st.selectbox(
                     "Suivi médical requis",
-                    [
-                        "",
-                        "VIP",
-                        "SIR",
-                        "VIP + SIR",
-                    ],
-                    index=(
-                        [
-                            "",
-                            "VIP",
-                            "SIR",
-                            "VIP + SIR",
-                        ].index(vip_sir_detecte)
-                        if vip_sir_detecte
-                        in [
-                            "",
-                            "VIP",
-                            "SIR",
-                            "VIP + SIR",
-                        ]
-                        else 0
+                    options_vip_sir,
+                    index=index_vip_sir,
+                    help=(
+                        "VIP = Visite Infirmier Périodique. "
+                        "SIR = Suivi Individuel Renforcé "
+                        "(postes à risques)."
                     ),
                 )
 
                 valider = st.form_submit_button(
                     "Enregistrer cette fiche de poste"
                 )
+
+            # ==================================================
+            # ENREGISTREMENT
+            # ==================================================
 
             if valider:
 
@@ -811,6 +935,10 @@ elif page == "🏢 Importer une fiche de poste":
                         st.exception(
                             erreur
                         )
+
+            # ==================================================
+            # TEXTE EXTRAIT
+            # ==================================================
 
             with st.expander(
                 "Voir le texte extrait de la fiche de poste"
@@ -871,40 +999,50 @@ elif page == "📁 Postethèque":
 
         for poste_item in postes_liste:
 
-            poste_id = poste_item.get("id")
-            entreprise = (
-                poste_item.get("entreprise") or ""
+            poste_id = poste_item.get(
+                "id"
             )
-            intitule = (
-                poste_item.get("poste") or ""
-            )
-            competences = (
-                poste_item.get("competences") or ""
-            )
-            taches = (
-                poste_item.get("taches") or ""
-            )
-            vip_sir = (
-                poste_item.get("vip_sir") or ""
-            )
-            caces = (
-                poste_item.get("caces") or ""
-            )
-            permis = (
-                poste_item.get("permis") or ""
-            )
-            date_creation = (
-                poste_item.get("date_creation") or ""
-            )
-            texte_poste = (
-                poste_item.get("texte") or ""
-            )
+
+            entreprise = poste_item.get(
+                "entreprise"
+            ) or ""
+
+            intitule = poste_item.get(
+                "poste"
+            ) or ""
+
+            competences = poste_item.get(
+                "competences"
+            ) or ""
+
+            taches = poste_item.get(
+                "taches"
+            ) or ""
+
+            vip_sir = poste_item.get(
+                "vip_sir"
+            ) or ""
+
+            caces = poste_item.get(
+                "caces"
+            ) or ""
+
+            permis = poste_item.get(
+                "permis"
+            ) or ""
+
+            date_creation = poste_item.get(
+                "date_creation"
+            ) or ""
+
+            texte_poste = poste_item.get(
+                "texte"
+            ) or ""
 
             texte_recherche_poste = (
                 f"{entreprise} "
                 f"{intitule} "
                 f"{competences} "
-                f"{taches} "
                 f"{caces} "
                 f"{permis} "
                 f"{texte_poste}"
@@ -951,27 +1089,27 @@ elif page == "📁 Postethèque":
                 )
 
                 st.write(
-                    "**Compétences requises :** "
+                    f"**Compétences requises :** "
                     f"{competences if competences else 'Non renseigné'}"
                 )
 
                 st.write(
-                    "**Tâches à réaliser :** "
+                    f"**Tâches à réaliser :** "
                     f"{taches if taches else 'Non renseigné'}"
                 )
 
                 st.write(
-                    "**CACES requis :** "
+                    f"**CACES requis :** "
                     f"{caces if caces else 'Aucun'}"
                 )
 
                 st.write(
-                    "**Permis requis :** "
+                    f"**Permis requis :** "
                     f"{permis if permis else 'Non renseigné'}"
                 )
 
                 st.write(
-                    "**Suivi médical :** "
+                    f"**Suivi médical :** "
                     f"{vip_sir if vip_sir else 'Non renseigné'}"
                 )
 
@@ -989,9 +1127,7 @@ elif page == "📁 Postethèque":
                             texte_poste
                         )
 
-                st.markdown(
-                    "---"
-                )
+                st.markdown("---")
 
                 if st.button(
                     "🗑️ Supprimer cette fiche de poste",
@@ -1062,7 +1198,9 @@ elif page == "🔍 Matching":
 
         choix_poste = st.selectbox(
             "Choisissez une fiche de poste",
-            list(options_postes.keys()),
+            list(
+                options_postes.keys()
+            ),
         )
 
         poste_id = options_postes[
@@ -1081,13 +1219,13 @@ elif page == "🔍 Matching":
 
         else:
 
-            poste_nom = (
-                poste.get("poste") or ""
-            )
+            poste_nom = poste.get(
+                "poste"
+            ) or ""
 
-            entreprise_nom = (
-                poste.get("entreprise") or ""
-            )
+            entreprise_nom = poste.get(
+                "entreprise"
+            ) or ""
 
             resultats = []
 
@@ -1100,26 +1238,21 @@ elif page == "🔍 Matching":
 
                 resultats.append(
                     {
-                        "cv_id": cv.get("id"),
-                        "candidat": (
-                            cv.get("candidat")
-                            or ""
+                        "cv_id": cv.get(
+                            "id"
                         ),
-                        "metier": (
-                            resultat_matching[
-                                "metier_cv"
-                            ]
-                        ),
-                        "score": (
-                            resultat_matching[
-                                "score"
-                            ]
-                        ),
-                        "explication": (
-                            resultat_matching[
-                                "explication"
-                            ]
-                        ),
+                        "candidat": cv.get(
+                            "candidat"
+                        ) or "",
+                        "metier": resultat_matching[
+                            "metier_cv"
+                        ],
+                        "score": resultat_matching[
+                            "score"
+                        ],
+                        "explication": resultat_matching[
+                            "explication"
+                        ],
                     }
                 )
 
@@ -1156,17 +1289,12 @@ elif page == "🔍 Matching":
                             ligne_explication
                         )
 
-                    st.markdown(
-                        "---"
-                    )
+                    st.markdown("---")
 
                     statut = st.selectbox(
                         "Statut de la candidature",
                         STATUTS_SUIVI,
-                        key=(
-                            f"statut_"
-                            f"{r['cv_id']}"
-                        ),
+                        key=f"statut_{r['cv_id']}",
                     )
 
                     type_entreprise = st.radio(
@@ -1184,10 +1312,7 @@ elif page == "🔍 Matching":
 
                     if st.button(
                         "Ajouter au suivi",
-                        key=(
-                            f"suivi_"
-                            f"{r['cv_id']}"
-                        ),
+                        key=f"suivi_{r['cv_id']}",
                     ):
 
                         try:
@@ -1218,9 +1343,7 @@ elif page == "🔍 Matching":
                                 erreur
                             )
 
-                    st.markdown(
-                        "---"
-                    )
+                    st.markdown("---")
 
                     if st.button(
                         "📧 Générer une présentation",
@@ -1316,37 +1439,33 @@ elif page == "📋 Suivi des candidatures":
 
         for ligne in lignes:
 
-            suivi_id = ligne.get("id")
-
-            candidat = (
-                ligne.get("candidat")
-                or ""
+            suivi_id = ligne.get(
+                "id"
             )
 
-            entreprise = (
-                ligne.get("entreprise")
-                or ""
-            )
+            candidat = ligne.get(
+                "candidat"
+            ) or ""
 
-            poste = (
-                ligne.get("poste")
-                or ""
-            )
+            entreprise = ligne.get(
+                "entreprise"
+            ) or ""
 
-            statut = (
-                ligne.get("statut")
-                or ""
-            )
+            poste = ligne.get(
+                "poste"
+            ) or ""
 
-            type_entreprise = (
-                ligne.get("type_entreprise")
-                or ""
-            )
+            statut = ligne.get(
+                "statut"
+            ) or ""
 
-            date_creation = (
-                ligne.get("date_creation")
-                or ""
-            )
+            type_entreprise = ligne.get(
+                "type_entreprise"
+            ) or ""
+
+            date_creation = ligne.get(
+                "date_creation"
+            ) or ""
 
             col1, col2 = st.columns(
                 [4, 2]
@@ -1387,10 +1506,7 @@ elif page == "📋 Suivi des candidatures":
                         if statut in STATUTS_SUIVI
                         else 0
                     ),
-                    key=(
-                        f"maj_statut_"
-                        f"{suivi_id}"
-                    ),
+                    key=f"maj_statut_{suivi_id}",
                     label_visibility="collapsed",
                 )
 
@@ -1450,6 +1566,4 @@ elif page == "📈 Statistiques":
                 f"{nb} candidature(s)"
             )
 
-            st.markdown(
-                "---"
-            )
+            st.markdown("---")
