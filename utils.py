@@ -12,8 +12,8 @@ def extract_text(file):
     Extrait le texte d'un fichier PDF ou Word (.docx).
 
     IMPORTANT :
-    On conserve les retours à la ligne afin de permettre
-    l'analyse des tâches et des rubriques.
+    Le texte brut conserve les retours à la ligne afin de permettre
+    l'analyse des tâches ligne par ligne.
     """
 
     nom_fichier = getattr(file, "name", "") or ""
@@ -21,29 +21,44 @@ def extract_text(file):
 
     if nom_fichier_min.endswith(".docx"):
         texte = extraire_texte_docx(file)
-    else:
+
+    elif nom_fichier_min.endswith(".pdf"):
         texte = extraire_texte_pdf(file)
 
-    return nettoyer_texte_structure(texte)
+    else:
+        texte = ""
 
+    return nettoyer_texte(texte)
+
+
+# ============================================================
+# EXTRACTION PDF
+# ============================================================
 
 def extraire_texte_pdf(file):
     """
-    Extrait le texte d'un fichier PDF en conservant
-    autant que possible la structure des lignes.
+    Extrait le texte d'un fichier PDF.
+
+    Les retours à la ligne des pages sont conservés.
     """
 
-    texte = []
+    morceaux = []
 
     with pdfplumber.open(file) as pdf:
+
         for page in pdf.pages:
-            page_texte = page.extract_text() or ""
 
-            if page_texte:
-                texte.append(page_texte)
+            texte_page = page.extract_text()
 
-    return "\n".join(texte)
+            if texte_page:
+                morceaux.append(texte_page)
 
+    return "\n".join(morceaux)
+
+
+# ============================================================
+# EXTRACTION WORD
+# ============================================================
 
 def extraire_texte_docx(file):
     """
@@ -53,27 +68,37 @@ def extraire_texte_docx(file):
     - les paragraphes ;
     - les tableaux.
 
-    Les retours à la ligne sont conservés.
+    Les lignes sont conservées afin de permettre la détection
+    des tâches commençant par des verbes d'action.
     """
 
     document = docx.Document(file)
 
     morceaux = []
 
-    # Paragraphes
+    # --------------------------------------------------------
+    # PARAGRAPHES
+    # --------------------------------------------------------
+
     for paragraphe in document.paragraphs:
+
         texte = paragraphe.text.strip()
 
         if texte:
             morceaux.append(texte)
 
-    # Tableaux
+    # --------------------------------------------------------
+    # TABLEAUX
+    # --------------------------------------------------------
+
     for table in document.tables:
+
         for ligne in table.rows:
 
             cellules = []
 
             for cellule in ligne.cells:
+
                 texte_cellule = cellule.text.strip()
 
                 if texte_cellule:
@@ -86,48 +111,61 @@ def extraire_texte_docx(file):
 
 
 # ============================================================
-# NETTOYAGE STRUCTURE
+# NETTOYAGE DU TEXTE
 # ============================================================
 
-def nettoyer_texte_structure(texte):
+def nettoyer_texte(texte):
     """
     Nettoie le texte sans supprimer les retours à la ligne.
 
-    Cette version est utilisée pour l'analyse des tâches
-    et des rubriques.
+    C'est important car metiers.py utilise les lignes du CV
+    pour identifier les tâches commençant par des verbes d'action.
+
+    Exemple conservé :
+
+        Préparer les commandes
+        Charger les camions
+        Contrôler les marchandises
+
     """
 
     if not texte:
         return ""
 
-    lignes = []
+    # Normalisation des retours à la ligne
+    texte = texte.replace("\r\n", "\n")
+    texte = texte.replace("\r", "\n")
 
-    for ligne in texte.splitlines():
+    lignes_nettoyees = []
+
+    for ligne in texte.split("\n"):
 
         ligne = ligne.strip()
 
         if not ligne:
             continue
 
-        # Normalisation des espaces
-        ligne = re.sub(r"\s+", " ", ligne)
+        # Remplacement de certains caractères gênants
+        ligne = ligne.replace("\u00a0", " ")
+        ligne = re.sub(r"[ \t]+", " ", ligne)
 
-        lignes.append(ligne)
+        lignes_nettoyees.append(ligne)
 
-    return "\n".join(lignes)
+    return "\n".join(lignes_nettoyees)
 
 
 # ============================================================
 # TEXTE NORMALISÉ POUR LES RECHERCHES
 # ============================================================
 
-def nettoyer_texte(texte):
+def normaliser_texte(texte):
     """
     Produit une version simplifiée du texte pour les recherches
-    de mots-clés et le matching.
+    par mots-clés.
 
-    Contrairement à nettoyer_texte_structure(), cette fonction
-    supprime volontairement les retours à la ligne.
+    Cette fonction ne remplace PAS nettoyer_texte().
+    Elle est disponible lorsque l'application a besoin d'un texte
+    sans accents ni ponctuation.
     """
 
     if not texte:
@@ -135,15 +173,17 @@ def nettoyer_texte(texte):
 
     texte = texte.lower()
 
-    texte = texte.replace("\n", " ")
-
     texte = re.sub(
-        r"[^a-zàâçéèêëîïôûùüÿñæœ0-9 ]",
+        r"[^a-zàâçéèêëîïôûùüÿñæœ0-9\s]",
         " ",
-        texte
+        texte,
     )
 
-    texte = re.sub(r"\s+", " ", texte)
+    texte = re.sub(
+        r"\s+",
+        " ",
+        texte,
+    )
 
     return texte.strip()
 
@@ -159,8 +199,12 @@ def generer_presentation(
     caces,
     permis,
     entreprise,
-    agence
+    agence,
 ):
+    """
+    Génère une présentation simple du candidat à envoyer
+    à l'entreprise.
+    """
 
     texte = f"""
 Objet : Proposition de candidature – {metier}
@@ -189,4 +233,4 @@ ID'EES Intérim
 Agence de {agence}
 """
 
-    return texte
+    return texte.strip()
