@@ -2,3 +2,4 @@ streamlit
 pdfplumber
 scikit-learn
 supabase
+python-docx
