@@ -42,6 +42,7 @@ def enregistrer_cv(
     permis,
     type_profil,
     texte,
+    taches="",
 ):
     donnees = {
         "agence": agence,
@@ -53,6 +54,7 @@ def enregistrer_cv(
         "permis": permis,
         "type_profil": type_profil,
         "texte": texte,
+        "taches": taches,
     }
 
     resultat = (
@@ -83,6 +85,8 @@ def enregistrer_poste(
     caces,
     permis,
     texte,
+    taches="",
+    vip_sir="",
 ):
     donnees = {
         "agence": agence,
@@ -92,6 +96,8 @@ def enregistrer_poste(
         "caces": caces,
         "permis": permis,
         "texte": texte,
+        "taches": taches,
+        "vip_sir": vip_sir,
     }
 
     resultat = (
@@ -265,7 +271,7 @@ def lister_cv(agence):
         supabase
         .table("cv")
         .select(
-            "id, candidat, metier, competences, "
+            "id, candidat, metier, competences, taches, "
             "caces, permis, type_profil, date_creation, texte"
         )
         .eq("agence", agence)
@@ -285,7 +291,7 @@ def recuperer_cvs_matching(agence):
         supabase
         .table("cv")
         .select(
-            "id, candidat, texte, metier, competences, "
+            "id, candidat, texte, metier, competences, taches, "
             "caces, permis, type_profil"
         )
         .eq("agence", agence)
@@ -305,169 +311,8 @@ def recuperer_postes(agence):
         supabase
         .table("postes")
         .select(
-            "id, entreprise, poste, competences, "
-            "caces, permis, texte, date_creation"
+            "id, entreprise, poste, competences, taches, "
+            "vip_sir, caces, permis, texte, date_creation"
         )
         .eq("agence", agence)
         .order("date_creation", desc=True)
-        .execute()
-    )
-
-    return resultat.data or []
-
-
-# ============================================================
-# RECUPERER UNE FICHE DE POSTE
-# ============================================================
-
-def recuperer_poste(id_poste):
-    resultat = (
-        supabase
-        .table("postes")
-        .select(
-            "id, entreprise, poste, competences, "
-            "caces, permis, texte, date_creation"
-        )
-        .eq("id", id_poste)
-        .single()
-        .execute()
-    )
-
-    return resultat.data
-
-
-# ============================================================
-# AJOUTER UNE CANDIDATURE AU SUIVI
-# ============================================================
-
-def ajouter_suivi(
-    agence,
-    candidat,
-    entreprise,
-    poste,
-    statut,
-    type_entreprise,
-):
-    return enregistrer_suivi(
-        agence,
-        candidat,
-        entreprise,
-        poste,
-        statut,
-        type_entreprise,
-    )
-
-
-# ============================================================
-# LISTER LE SUIVI
-# ============================================================
-
-def lister_suivi(agence):
-    resultat = (
-        supabase
-        .table("suivi")
-        .select(
-            "id, candidat, entreprise, poste, statut, "
-            "type_entreprise, date_creation"
-        )
-        .eq("agence", agence)
-        .order("date_creation", desc=True)
-        .execute()
-    )
-
-    return resultat.data or []
-
-
-# ============================================================
-# MODIFIER LE STATUT D'UNE CANDIDATURE
-# ============================================================
-
-def modifier_statut_suivi(suivi_id, nouveau_statut):
-    resultat = (
-        supabase
-        .table("suivi")
-        .update({"statut": nouveau_statut})
-        .eq("id", suivi_id)
-        .execute()
-    )
-
-    return resultat.data or []
-
-
-# ============================================================
-# RECUPERER UN CV
-# ============================================================
-
-def recuperer_cv(id_cv):
-    resultat = (
-        supabase
-        .table("cv")
-        .select(
-            "id, candidat, metier, competences, "
-            "caces, permis, type_profil, texte"
-        )
-        .eq("id", id_cv)
-        .single()
-        .execute()
-    )
-
-    return resultat.data
-
-
-# ============================================================
-# SUPPRIMER UN CV
-# ============================================================
-
-def supprimer_cv(id_cv):
-    return (
-        supabase
-        .table("cv")
-        .delete()
-        .eq("id", id_cv)
-        .execute()
-    )
-
-
-# ============================================================
-# SUPPRIMER UNE FICHE DE POSTE
-# ============================================================
-
-def supprimer_poste(id_poste):
-    return (
-        supabase
-        .table("postes")
-        .delete()
-        .eq("id", id_poste)
-        .execute()
-    )
-
-
-# ============================================================
-# STATISTIQUES PAR JOUR
-# ============================================================
-
-def statistiques_par_semaine(agence):
-    resultat = (
-        supabase
-        .table("suivi")
-        .select("date_creation")
-        .eq("agence", agence)
-        .order("date_creation", desc=True)
-        .execute()
-    )
-
-    lignes = resultat.data or []
-
-    statistiques = {}
-
-    for ligne in lignes:
-        date_creation = ligne.get("date_creation")
-
-        if not date_creation:
-            continue
-
-        jour = str(date_creation)[:10]
-
-        statistiques[jour] = statistiques.get(jour, 0) + 1
-
-    return list(statistiques.items())
