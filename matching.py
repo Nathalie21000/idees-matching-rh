@@ -229,3 +229,79 @@ def calculer_score(cv, poste):
 
             explication.append(
                 "⚠️ CACES requis absent du CV "
+                f"({', '.join(caces_poste)})"
+            )
+
+    # --------------------------------------------------
+    # PERMIS
+    # --------------------------------------------------
+
+    permis_poste = _liste_depuis_champ(poste.get("permis"))
+    permis_cv = _liste_depuis_champ(cv.get("permis"))
+
+    if not permis_poste:
+
+        score_permis = POIDS_PERMIS
+
+        explication.append(
+            "ℹ️ Aucun permis requis pour ce poste"
+        )
+
+    else:
+
+        permis_communs = [
+            p for p in permis_poste if p in permis_cv
+        ]
+
+        score_permis = (
+            len(permis_communs)
+            / len(permis_poste)
+            * POIDS_PERMIS
+        )
+
+        if len(permis_communs) == len(permis_poste):
+
+            explication.append(
+                "✅ Permis requis présent(s) "
+                f"({', '.join(permis_poste)})"
+            )
+
+        else:
+
+            explication.append(
+                "⚠️ Permis requis absent du CV "
+                f"({', '.join(permis_poste)})"
+            )
+
+    # --------------------------------------------------
+    # SUIVI MEDICAL VIP / SIR (information, non noté)
+    # --------------------------------------------------
+
+    vip_sir = poste.get("vip_sir")
+
+    if vip_sir:
+
+        explication.append(
+            f"ℹ️ Ce poste nécessite un suivi médical : {vip_sir}"
+        )
+
+    # --------------------------------------------------
+    # SCORE FINAL
+    # --------------------------------------------------
+
+    score_final = (
+        score_metier
+        + score_taches
+        + score_competences
+        + score_caces
+        + score_permis
+    )
+
+    score_final = round(min(score_final, 100))
+
+    return {
+        "score": score_final,
+        "explication": explication,
+        "metier_cv": metier_cv,
+        "metier_poste": metier_poste,
+    }
