@@ -1,6 +1,17 @@
 """
 Bibliothèque des métiers, compétences, tâches et mots-clés
-Version V9 - Extraction améliorée des tâches
+Version V9 - Extraction renforcée des fiches de poste
+
+Objectifs :
+- Détecter le métier
+- Extraire les compétences
+- Extraire les tâches
+- Détecter VIP / SIR
+- Lire les rubriques structurées des fiches de poste
+- Récupérer directement :
+    * Nom de l'entreprise
+    * Intitulé du poste
+    * Liste des tâches à proposer
 """
 
 import re
@@ -12,67 +23,150 @@ import re
 
 METIERS = {
     "Ouvrier VRD": [
-        "vrd", "voirie", "réseaux", "reseaux", "terrassement",
-        "bordures", "canalisations", "assainissement", "enrobé", "enrobe"
+        "vrd",
+        "voirie",
+        "réseaux",
+        "reseaux",
+        "terrassement",
+        "bordures",
+        "canalisations",
+        "assainissement",
+        "enrobé",
+        "enrobe",
     ],
+
     "Conducteur d'engins": [
-        "conducteur d'engins", "engin", "mini pelle", "pelle",
-        "chargeuse", "compacteur", "tractopelle", "r482", "caces r482"
+        "conducteur d'engins",
+        "conducteur engins",
+        "engin",
+        "mini pelle",
+        "minipelle",
+        "pelle",
+        "chargeuse",
+        "compacteur",
+        "tractopelle",
+        "r482",
+        "caces r482",
     ],
+
     "Cariste": [
-        "cariste", "r489", "caces r489", "gerbeur", "chariot", "logistique"
+        "cariste",
+        "r489",
+        "caces r489",
+        "gerbeur",
+        "chariot",
+        "logistique",
     ],
+
     "Préparateur de commandes": [
-        "préparateur", "preparateur", "commande", "commandes",
-        "scan", "picking", "logistique"
+        "préparateur",
+        "preparateur",
+        "préparateur de commandes",
+        "preparateur de commandes",
+        "commande",
+        "commandes",
+        "scan",
+        "picking",
+        "logistique",
     ],
+
     "Agent de production": [
-        "production", "industrie", "conditionnement", "assemblage", "fabrication"
+        "production",
+        "industrie",
+        "conditionnement",
+        "assemblage",
+        "fabrication",
     ],
+
     "Soudeur": [
-        "soudeur", "mig", "mag", "tig", "soudure"
+        "soudeur",
+        "mig",
+        "mag",
+        "tig",
+        "soudure",
     ],
+
     "Électricien": [
-        "électricien", "electricien", "habilitation",
-        "b1", "b2", "br", "bc"
+        "électricien",
+        "electricien",
+        "habilitation",
+        "b1",
+        "b2",
+        "br",
+        "bc",
     ],
+
     "Maçon": [
-        "maçon", "macon", "coffrage", "béton", "beton", "ferraillage"
+        "maçon",
+        "macon",
+        "coffrage",
+        "béton",
+        "beton",
+        "ferraillage",
     ],
+
     "Manutentionnaire": [
-        "manutentionnaire", "manutention",
-        "port de charges", "port de charge", "colis"
+        "manutentionnaire",
+        "manutention",
+        "port de charges",
+        "port de charge",
+        "colis",
     ],
+
     "Chauffeur PL / SPL": [
-        "chauffeur pl", "chauffeur spl",
-        "permis c", "permis ce", "livraison", "transport routier"
+        "chauffeur pl",
+        "chauffeur spl",
+        "conducteur pl",
+        "conducteur spl",
+        "permis c",
+        "permis ce",
+        "livraison",
+        "transport routier",
     ],
+
     "Agent d'entretien": [
-        "agent d'entretien", "entretien",
-        "nettoyage", "propreté", "proprete"
+        "agent d'entretien",
+        "entretien",
+        "nettoyage",
+        "propreté",
+        "proprete",
     ],
+
     "Employé libre-service": [
-        "libre service", "libre-service",
-        "grande distribution", "mise en rayon", "caisse"
+        "libre service",
+        "libre-service",
+        "grande distribution",
+        "mise en rayon",
+        "caisse",
     ],
 }
 
 
 def detecter_metier(texte):
-    """Détecte le métier dominant à partir des mots-clés."""
+    """
+    Recherche le métier dominant en comptant les occurrences
+    des mots-clés présents dans le texte.
+    """
 
     if not texte:
         return "Non détecté"
 
     texte_min = texte.lower()
+
     meilleur_metier = "Non détecté"
     meilleur_score = 0
 
     for metier, mots in METIERS.items():
-        score = sum(
-            len(re.findall(re.escape(mot), texte_min))
-            for mot in mots
-        )
+
+        score = 0
+
+        for mot in mots:
+            score += len(
+                re.findall(
+                    re.escape(mot.lower()),
+                    texte_min,
+                )
+            )
 
         if score > meilleur_score:
             meilleur_score = score
@@ -135,18 +229,24 @@ COMPETENCES_PRO = [
 
 
 def extraire_competences_pro(texte):
-    """Recherche les compétences professionnelles génériques."""
+    """
+    Recherche les compétences professionnelles génériques
+    présentes dans le texte.
+    """
 
     if not texte:
         return []
 
     texte_min = texte.lower()
 
-    return [
-        competence
-        for competence in COMPETENCES_PRO
-        if competence in texte_min
-    ]
+    trouvees = []
+
+    for competence in COMPETENCES_PRO:
+
+        if competence.lower() in texte_min:
+            trouvees.append(competence)
+
+    return trouvees
 
 
 # ============================================================
@@ -198,229 +298,187 @@ TACHES = [
 
 
 def extraire_taches(texte):
-    """Recherche les tâches connues présentes dans le texte."""
+    """
+    Recherche les tâches/missions connues dans le texte.
+    """
 
     if not texte:
         return []
 
     texte_min = texte.lower()
 
-    return [
-        tache
-        for tache in TACHES
-        if tache in texte_min
-    ]
+    trouvees = []
+
+    for tache in TACHES:
+
+        if tache.lower() in texte_min:
+            trouvees.append(tache)
+
+    return trouvees
 
 
 # ============================================================
-# VERBES / FORMULATIONS D'ACTION
+# VERBES D'ACTION
 # ============================================================
 
 VERBES_ACTION = [
     "préparer",
     "prépare",
+    "préparation",
+
     "charger",
     "charge",
+    "chargement",
+
     "décharger",
     "décharge",
+    "déchargement",
+
     "contrôler",
-    "controle",
     "contrôle",
+    "controle",
+    "contrôle qualité",
+
     "utiliser",
     "utilise",
+    "utilisation",
+
     "conduire",
     "conduit",
+    "conduite",
+
     "assembler",
     "assemble",
+    "assemblage",
+
     "monter",
     "monte",
+    "montage",
+
     "souder",
     "soude",
+    "soudure",
+
     "nettoyer",
     "nettoie",
+    "nettoyage",
+
     "ranger",
     "range",
+    "rangement",
+
     "gérer",
-    "gere",
     "gère",
+    "gestion",
+
     "réceptionner",
-    "receptionner",
     "réceptionne",
+    "réception",
+
     "expédier",
-    "expedier",
     "expédie",
+    "expédition",
+
     "trier",
     "trie",
+    "tri",
+
     "étiqueter",
-    "etiqueter",
     "étiquette",
+    "étiquetage",
+
     "emballer",
     "emballe",
+    "emballage",
+
     "livrer",
     "livre",
+    "livraison",
+
     "encadrer",
     "encadre",
+    "encadrement",
+
     "former",
     "forme",
+    "formation",
+
     "câbler",
-    "cable",
     "câble",
+    "câblage",
+
     "poser",
     "pose",
+
     "couler",
     "coule",
+    "coulage",
+
     "coffrer",
     "coffre",
+    "coffrage",
+
     "ferrailler",
     "ferraille",
+    "ferraillage",
+
     "terrasser",
     "terrasse",
+    "terrassement",
+
     "encaisser",
     "encaisse",
+    "encaissement",
+
     "accueillir",
     "accueille",
+    "accueil",
+
     "manutentionner",
     "manutentionne",
+    "manutention",
+
     "approvisionner",
     "approvisionne",
+    "approvisionnement",
+
     "installer",
     "installe",
+
     "vérifier",
-    "verifier",
     "vérifie",
+    "vérification",
+
     "surveiller",
     "surveille",
+    "surveillance",
+
     "inspecter",
     "inspecte",
+    "inspection",
+
     "manipuler",
     "manipule",
+    "manipulation",
+
     "fabriquer",
     "fabrique",
+    "fabrication",
+
     "produire",
     "produit",
+    "production",
+
     "peindre",
     "peint",
+    "peinture",
+
     "picker",
     "pick",
+
     "palettiser",
     "palettise",
 ]
-
-
-# Formulations nominales très fréquentes dans les CV.
-# Elles sont considérées comme des tâches lorsqu'elles
-# constituent une ligne ou un élément autonome.
-FORMULATIONS_TACHES = [
-    "préparation ",
-    "chargement ",
-    "déchargement ",
-    "contrôle ",
-    "controle ",
-    "utilisation ",
-    "conduite ",
-    "assemblage ",
-    "montage ",
-    "soudure ",
-    "nettoyage ",
-    "rangement ",
-    "gestion ",
-    "réception ",
-    "reception ",
-    "expédition ",
-    "expedition ",
-    "tri ",
-    "étiquetage ",
-    "etiquetage ",
-    "emballage ",
-    "livraison ",
-    "encadrement ",
-    "formation ",
-    "câblage ",
-    "cablage ",
-    "pose ",
-    "coulage ",
-    "coffrage ",
-    "ferraillage ",
-    "terrassement ",
-    "manutention ",
-    "approvisionnement ",
-    "installation ",
-    "vérification ",
-    "verification ",
-    "surveillance ",
-    "inspection ",
-    "manipulation ",
-    "fabrication ",
-    "production ",
-    "peinture ",
-    "palettisation ",
-    "picking ",
-    "mise en rayon ",
-    "accueil ",
-]
-
-
-def _nettoyer_ligne_tache(ligne):
-    """Nettoie une ligne avant analyse."""
-
-    ligne = ligne.strip()
-
-    # Suppression des puces
-    ligne = re.sub(
-        r"^[\s\-•*·▪◦►→]+",
-        "",
-        ligne
-    )
-
-    # Suppression des espaces multiples
-    ligne = re.sub(r"\s+", " ", ligne)
-
-    return ligne.strip(" .,;:-")
-
-
-def _premier_mot(ligne):
-    """Retourne le premier mot significatif d'une ligne."""
-
-    ligne = _nettoyer_ligne_tache(ligne)
-
-    if not ligne:
-        return ""
-
-    morceaux = re.split(r"[\s,;:.!?]+", ligne.lower())
-
-    return morceaux[0].strip()
-
-
-def est_ligne_tache(ligne):
-    """
-    Détermine si une ligne ressemble à une tâche réalisée.
-
-    Une ligne est reconnue si :
-    - elle commence par un verbe d'action ;
-    - ou elle commence par une formulation nominale typique
-      d'une tâche.
-    """
-
-    ligne = _nettoyer_ligne_tache(ligne)
-
-    if not ligne:
-        return False
-
-    if len(ligne) > 180:
-        return False
-
-    ligne_min = ligne.lower()
-
-    premier = _premier_mot(ligne)
-
-    if premier in VERBES_ACTION:
-        return True
-
-    for formulation in FORMULATIONS_TACHES:
-        if ligne_min.startswith(formulation):
-            return True
-
-    return False
 
 
 def extraire_taches_par_lignes(
@@ -428,22 +486,11 @@ def extraire_taches_par_lignes(
     rubrique_actuelle=""
 ):
     """
-    Analyse le texte ligne par ligne.
+    Détecte les lignes commençant par un verbe d'action.
 
-    Les tâches sont conservées avec leur rubrique d'origine.
-
-    Exemple :
-        Compétences
-        Préparer les commandes
-        Charger les camions
-
-    devient :
-        {
-            "Compétences": [
-                "Préparer les commandes",
-                "Charger les camions"
-            ]
-        }
+    Cette fonction reste utile notamment pour les CV où les
+    collègues écrivent des missions dans la rubrique
+    "Compétences".
     """
 
     if not texte_brut:
@@ -451,62 +498,46 @@ def extraire_taches_par_lignes(
 
     taches_par_rubrique = {}
 
-    rubrique = rubrique_actuelle or "Document"
+    for ligne in texte_brut.split("\n"):
 
-    for ligne in texte_brut.splitlines():
-
-        ligne_nettoyee = _nettoyer_ligne_tache(ligne)
+        ligne_nettoyee = ligne.strip()
 
         if not ligne_nettoyee:
             continue
 
-        if est_ligne_tache(ligne_nettoyee):
+        if len(ligne_nettoyee) > 180:
+            continue
 
-            if rubrique not in taches_par_rubrique:
-                taches_par_rubrique[rubrique] = []
+        ligne_test = ligne_nettoyee.lower()
 
-            if ligne_nettoyee not in taches_par_rubrique[rubrique]:
-                taches_par_rubrique[rubrique].append(
-                    ligne_nettoyee
-                )
+        # Suppression des puces
+        ligne_test = re.sub(
+            r"^[\-\–\—•\*\·]+\s*",
+            "",
+            ligne_test,
+        )
+
+        premier_mot = re.split(
+            r"[\s,;:.]+",
+            ligne_test,
+        )[0]
+
+        if premier_mot in VERBES_ACTION:
+
+            if rubrique_actuelle not in taches_par_rubrique:
+                taches_par_rubrique[rubrique_actuelle] = []
+
+            valeur = ligne_nettoyee.rstrip(
+                ".,:;"
+            )
+
+            if valeur not in taches_par_rubrique[rubrique_actuelle]:
+
+                taches_par_rubrique[
+                    rubrique_actuelle
+                ].append(valeur)
 
     return taches_par_rubrique
-
-
-def extraire_taches_cv(texte_brut):
-    """
-    Extraction spécifique des tâches réalisées dans un CV.
-
-    Contrairement à extraire_taches_par_lignes(), cette fonction
-    renvoie directement une liste unique de tâches.
-    """
-
-    if not texte_brut:
-        return []
-
-    resultat = []
-
-    for ligne in texte_brut.splitlines():
-
-        ligne_nettoyee = _nettoyer_ligne_tache(ligne)
-
-        if not ligne_nettoyee:
-            continue
-
-        if est_ligne_tache(ligne_nettoyee):
-
-            if ligne_nettoyee not in resultat:
-                resultat.append(ligne_nettoyee)
-
-    # Ajout des tâches connues présentes dans le texte,
-    # même si leur formulation n'était pas sur une ligne
-    # commençant par un verbe.
-    for tache in extraire_taches(texte_brut):
-
-        if tache not in resultat:
-            resultat.append(tache)
-
-    return resultat
 
 
 # ============================================================
@@ -514,7 +545,9 @@ def extraire_taches_cv(texte_brut):
 # ============================================================
 
 def detecter_vip_sir(texte):
-    """Détecte VIP et/ou SIR."""
+    """
+    Détecte la présence de VIP et/ou SIR.
+    """
 
     if not texte:
         return ""
@@ -526,7 +559,8 @@ def detecter_vip_sir(texte):
         or "visite infirmier périodique" in texte_min
         or "visite infirmier periodique" in texte_min
         or "visite d'information et de prévention" in texte_min
-        or "visite d information et de prevention" in texte_min
+        or "visite d information et de prévention" in texte_min
+        or "visite information et prevention" in texte_min
     )
 
     sir = (
@@ -548,172 +582,431 @@ def detecter_vip_sir(texte):
 
 
 # ============================================================
-# LECTURE DES RUBRIQUES DE FICHE DE POSTE
+# OUTILS DE NORMALISATION
 # ============================================================
 
-RUBRIQUES_FICHE_POSTE = [
-    (
-        "entreprise",
-        [
-            r"nom\s+de\s+l['’]entreprise\s*:?"
-        ]
-    ),
-    (
-        "intitule",
-        [
-            r"intitul[ée]\s+du\s+poste\s*:?"
-        ]
-    ),
-    (
-        "taches",
-        [
-            r"liste\s+des\s+t[âa]ches\s+propos[ée]es?\s*:?"
-        ]
-    ),
-    (
-        "habilitations",
-        [
-            r"habilitations,?\s+certificats\s+et\s+dipl[oô]mes\s+obligatoires\s*:?"
-        ]
-    ),
-    (
-        "conduite_engins",
-        [
-            r"conduite\s+d['’]engins\s*:?"
-        ]
-    ),
-    (
-        "machines_outils",
-        [
-            r"utilisation\s+de\s+machines\s*/?\s*outils\s*:?"
-        ]
-    ),
-    (
-        "securite_risques",
-        [
-            r"sécurité\s*:?",
-            r"risques\s*:?",
-            r"consignes\s+de\s+sécurité\s*:?",
-            r"sécurité\s+et\s+risques\s*:?"
-        ]
-    ),
-]
-
-
-def _capturer_apres_libelle(
-    texte_brut,
-    motif_libelle
-):
+def _normaliser_texte(texte):
     """
-    Capture les lignes situées après un libellé jusqu'à
-    la prochaine rubrique reconnue.
+    Normalise un texte pour permettre des recherches robustes
+    même lorsque utils.py a supprimé les accents ou la ponctuation.
     """
 
-    correspondance = re.search(
-        motif_libelle,
-        texte_brut,
-        flags=re.IGNORECASE
-    )
-
-    if not correspondance:
+    if not texte:
         return ""
 
-    apres = texte_brut[correspondance.end():]
+    texte = texte.lower()
 
-    lignes_capturees = []
+    remplacements = {
+        "’": "'",
+        "–": "-",
+        "—": "-",
+        "\n": " ",
+        "\r": " ",
+        "\t": " ",
+    }
 
-    for ligne in apres.splitlines():
+    for ancien, nouveau in remplacements.items():
+        texte = texte.replace(ancien, nouveau)
 
-        ligne_nettoyee = ligne.strip()
+    texte = re.sub(
+        r"\s+",
+        " ",
+        texte,
+    )
 
-        if not ligne_nettoyee:
-            if lignes_capturees:
-                continue
-            continue
+    return texte.strip()
 
-        est_une_autre_rubrique = any(
-            re.match(
-                motif,
-                ligne_nettoyee,
-                flags=re.IGNORECASE
-            )
-            for _, motifs in RUBRIQUES_FICHE_POSTE
-            for motif in motifs
+
+def _normaliser_libelle(texte):
+    """
+    Rend les comparaisons de libellés plus tolérantes.
+    """
+
+    if not texte:
+        return ""
+
+    texte = texte.lower()
+
+    # Accents
+    traductions = str.maketrans(
+        "àâäéèêëîïôöùûüÿç",
+        "aaaeeeeiioouuuyc",
+    )
+
+    texte = texte.translate(traductions)
+
+    texte = texte.replace(
+        "’",
+        "'",
+    )
+
+    texte = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        texte,
+    )
+
+    texte = re.sub(
+        r"\s+",
+        " ",
+        texte,
+    )
+
+    return texte.strip()
+
+
+# ============================================================
+# LIBELLES DU MODELE DE FICHE DE POSTE
+# ============================================================
+
+LIBELLES_FICHE_POSTE = {
+
+    "entreprise": [
+        "nom de l'entreprise",
+        "nom de entreprise",
+        "entreprise",
+    ],
+
+    "intitule": [
+        "intitulé du poste",
+        "intitule du poste",
+        "intitulé poste",
+        "intitule poste",
+    ],
+
+    "taches": [
+        "liste des tâches à proposer",
+        "liste des taches a proposer",
+        "liste des tâches proposer",
+        "liste des taches proposer",
+        "tâches à proposer",
+        "taches a proposer",
+    ],
+
+    "habilitations": [
+        "habilitations, certificats et diplômes obligatoires",
+        "habilitations certificats et diplômes obligatoires",
+        "habilitations certificats et diplomes obligatoires",
+        "habilitations",
+    ],
+
+    "conduite_engins": [
+        "conduite d'engins",
+        "conduite d engins",
+    ],
+
+    "machines_outils": [
+        "utilisation de machines / outils",
+        "utilisation de machines outils",
+        "utilisation de machines",
+        "machines / outils",
+        "machines outils",
+    ],
+
+    "securite_risques": [
+        "sécurité et risques",
+        "securite et risques",
+        "consignes de sécurité",
+        "consignes de securite",
+        "sécurité",
+        "securite",
+        "risques",
+    ],
+}
+
+
+# ============================================================
+# RECHERCHE D'UN LIBELLE
+# ============================================================
+
+def _trouver_libelle(
+    texte,
+    libelles,
+):
+    """
+    Recherche la position d'un libellé dans le texte.
+
+    Retourne :
+        (position_debut, position_fin)
+    ou :
+        None
+    """
+
+    if not texte:
+        return None
+
+    texte_normalise = _normaliser_libelle(
+        texte
+    )
+
+    meilleur = None
+
+    for libelle in libelles:
+
+        libelle_normalise = _normaliser_libelle(
+            libelle
         )
 
-        if est_une_autre_rubrique:
-            break
+        if not libelle_normalise:
+            continue
 
-        lignes_capturees.append(ligne_nettoyee)
+        position = texte_normalise.find(
+            libelle_normalise
+        )
 
-        if len(lignes_capturees) >= 15:
-            break
+        if position >= 0:
 
-    return " / ".join(lignes_capturees)
+            fin = position + len(
+                libelle_normalise
+            )
 
+            if meilleur is None or position < meilleur[0]:
+
+                meilleur = (
+                    position,
+                    fin,
+                    libelle_normalise,
+                )
+
+    return meilleur
+
+
+# ============================================================
+# EXTRACTION ENTRE DEUX RUBRIQUES
+# ============================================================
+
+def _extraire_valeur_rubrique(
+    texte,
+    libelles_depart,
+    toutes_les_rubriques,
+):
+    """
+    Extrait le contenu situé après un libellé et avant
+    le prochain libellé connu.
+
+    Cette méthode est importante car le texte venant de
+    utils.py peut être aplati sur une seule ligne.
+    """
+
+    if not texte:
+        return ""
+
+    texte_normalise = _normaliser_libelle(
+        texte
+    )
+
+    depart = _trouver_libelle(
+        texte,
+        libelles_depart,
+    )
+
+    if not depart:
+        return ""
+
+    position_depart = depart[1]
+
+    prochaine_position = len(
+        texte_normalise
+    )
+
+    for nom_rubrique, libelles in toutes_les_rubriques.items():
+
+        if libelles is libelles_depart:
+            continue
+
+        position = _trouver_libelle(
+            texte,
+            libelles,
+        )
+
+        if not position:
+            continue
+
+        position_debut = position[0]
+
+        if position_debut > position_depart:
+
+            prochaine_position = min(
+                prochaine_position,
+                position_debut,
+            )
+
+    valeur = texte_normalise[
+        position_depart:prochaine_position
+    ]
+
+    valeur = valeur.strip(
+        " :;-–—|/"
+    )
+
+    return valeur.strip()
+
+
+# ============================================================
+# EXTRACTION SPECIFIQUE DE LA FICHE DE POSTE
+# ============================================================
 
 def extraire_sections_poste(texte_brut):
-    """Extrait les principales rubriques de la fiche de poste."""
+    """
+    Extraction structurée des informations de la fiche de poste.
+
+    Priorité aux libellés du modèle :
+
+    - Nom de l'entreprise
+    - Intitulé du poste
+    - Liste des tâches à proposer
+    - Habilitations...
+    - Conduite d'engins
+    - Utilisation de machines / outils
+    - Sécurité / risques
+
+    Retourne un dictionnaire exploitable directement
+    par app.py.
+    """
 
     resultat = {
-        cle: ""
-        for cle, _ in RUBRIQUES_FICHE_POSTE
+        "entreprise": "",
+        "intitule": "",
+        "taches": "",
+        "habilitations": "",
+        "conduite_engins": "",
+        "machines_outils": "",
+        "securite_risques": "",
+        "vip": False,
+        "sir": False,
     }
 
     if not texte_brut:
         return resultat
 
-    for cle, motifs in RUBRIQUES_FICHE_POSTE:
+    for rubrique, libelles in LIBELLES_FICHE_POSTE.items():
 
-        for motif in motifs:
+        valeur = _extraire_valeur_rubrique(
+            texte_brut,
+            libelles,
+            LIBELLES_FICHE_POSTE,
+        )
 
-            valeur = _capturer_apres_libelle(
-                texte_brut,
-                motif
-            )
+        resultat[rubrique] = valeur
 
-            if valeur:
-                resultat[cle] = valeur
-                break
+    # --------------------------------------------------------
+    # VIP / SIR
+    # --------------------------------------------------------
 
-    vip_sir = detecter_vip_sir(texte_brut)
+    texte_min = _normaliser_texte(
+        texte_brut
+    )
 
-    resultat["vip"] = "VIP" in vip_sir
-    resultat["sir"] = "SIR" in vip_sir
-    resultat["vip_sir"] = vip_sir
+    resultat["vip"] = (
+        bool(re.search(
+            r"\bvip\b",
+            texte_min,
+        ))
+        or "visite infirmier périodique" in texte_min
+        or "visite infirmier periodique" in texte_min
+        or "visite d'information et de prévention" in texte_min
+        or "visite d information et de prevention" in texte_min
+    )
+
+    resultat["sir"] = (
+        bool(re.search(
+            r"\bsir\b",
+            texte_min,
+        ))
+        or "suivi individuel renforcé" in texte_min
+        or "suivi individuel renforce" in texte_min
+    )
 
     return resultat
 
 
+# ============================================================
+# ANALYSE COMPLETE DE LA FICHE DE POSTE
+# ============================================================
+
 def analyser_fiche_poste(texte_brut):
     """
-    Analyse une fiche de poste en donnant priorité aux
-    rubriques structurées du modèle ID'EES.
+    Analyse complète d'une fiche de poste.
+
+    Les rubriques du modèle sont prioritaires.
+
+    Si une information n'est pas trouvée directement,
+    l'application utilise les anciennes méthodes de secours.
     """
 
     sections = extraire_sections_poste(
         texte_brut
     )
 
+    # --------------------------------------------------------
+    # ENTREPRISE
+    # --------------------------------------------------------
+
+    if not sections.get("entreprise"):
+
+        sections["entreprise"] = ""
+
+    # --------------------------------------------------------
+    # INTITULE
+    # --------------------------------------------------------
+
     if not sections.get("intitule"):
+
         sections["intitule"] = detecter_metier(
             texte_brut
         )
 
+    # --------------------------------------------------------
+    # TACHES
+    # --------------------------------------------------------
+
     if not sections.get("taches"):
-        sections["taches"] = " / ".join(
-            extraire_taches(texte_brut)
+
+        taches_generiques = extraire_taches(
+            texte_brut
         )
 
-    if not sections.get("competences"):
-        sections["competences"] = " / ".join(
-            extraire_competences_pro(texte_brut)
+        sections["taches"] = " / ".join(
+            taches_generiques
         )
+
+    # --------------------------------------------------------
+    # COMPETENCES
+    # --------------------------------------------------------
+
+    sections["competences"] = " / ".join(
+        extraire_competences_pro(
+            texte_brut
+        )
+    )
+
+    # --------------------------------------------------------
+    # VIP / SIR
+    # --------------------------------------------------------
+
+    if sections.get("vip") and sections.get("sir"):
+
+        sections["vip_sir"] = "VIP + SIR"
+
+    elif sections.get("vip"):
+
+        sections["vip_sir"] = "VIP"
+
+    elif sections.get("sir"):
+
+        sections["vip_sir"] = "SIR"
+
+    else:
+
+        sections["vip_sir"] = ""
+
+    # --------------------------------------------------------
+    # TACHES PAR RUBRIQUE
+    # --------------------------------------------------------
 
     sections["taches_par_rubrique"] = (
         extraire_taches_par_lignes(
-            texte_brut,
-            "Tâches"
+            texte_brut
         )
     )
 
