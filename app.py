@@ -25,7 +25,13 @@ from database import (
 )
 
 from matching import calculer_score
-from metiers import METIERS, detecter_metier
+from metiers import (
+    METIERS,
+    detecter_metier,
+    extraire_competences_pro,
+    extraire_taches,
+    detecter_vip_sir,
+)
 
 from utils import (
     extract_text,
@@ -94,6 +100,13 @@ def extraire_candidat(nom_fichier):
 
 
 def extraire_competences(texte):
+    """
+    Combine les mots-clés liés aux métiers (METIERS) avec
+    une vraie liste de compétences professionnelles
+    génériques (COMPETENCES_PRO), pour obtenir une liste
+    de compétences réellement exploitable par le matching.
+    """
+
     trouve = set()
 
     texte_min = texte.lower()
@@ -102,6 +115,9 @@ def extraire_competences(texte):
         for mot in mots:
             if mot.lower() in texte_min:
                 trouve.add(mot)
+
+    for competence in extraire_competences_pro(texte):
+        trouve.add(competence)
 
     return ", ".join(sorted(trouve))
 
@@ -244,8 +260,8 @@ elif page == "📄 Importer un CV":
     st.title("📄 Importer un CV")
 
     fichier = st.file_uploader(
-        "Sélectionnez un CV (PDF)",
-        type=["pdf"],
+        "Sélectionnez un CV (PDF ou Word)",
+        type=["pdf", "docx"],
     )
 
     if fichier is not None:
@@ -255,8 +271,8 @@ elif page == "📄 Importer un CV":
         if not texte:
 
             st.error(
-                "Impossible d'extraire le texte de ce PDF "
-                "(fichier scanné ?)."
+                "Impossible d'extraire le texte de ce fichier "
+                "(document scanné ou vide ?)."
             )
 
         else:
@@ -271,6 +287,10 @@ elif page == "📄 Importer un CV":
 
             competences_detectees = extraire_competences(
                 texte
+            )
+
+            taches_detectees = ", ".join(
+                extraire_taches(texte)
             )
 
             caces_detectes = extraire_caces(
@@ -301,6 +321,15 @@ elif page == "📄 Importer un CV":
                 competences = st.text_area(
                     "Compétences détectées",
                     value=competences_detectees,
+                )
+
+                taches = st.text_area(
+                    "Tâches / missions déjà réalisées",
+                    value=taches_detectees,
+                    help=(
+                        "Détectées automatiquement dans le CV. "
+                        "Vous pouvez corriger ou compléter."
+                    ),
                 )
 
                 caces = st.text_input(
@@ -340,6 +369,7 @@ elif page == "📄 Importer un CV":
                         permis,
                         type_profil,
                         texte,
+                        taches,
                     )
 
                     st.success(
@@ -413,6 +443,7 @@ elif page == "📂 CVthèque":
             candidat = cv.get("candidat") or ""
             metier = cv.get("metier") or ""
             competences = cv.get("competences") or ""
+            taches = cv.get("taches") or ""
             caces = cv.get("caces") or ""
             permis = cv.get("permis") or ""
             type_profil = cv.get("type_profil") or ""
@@ -469,6 +500,11 @@ elif page == "📂 CVthèque":
                 )
 
                 st.write(
+                    f"**Tâches déjà réalisées :** "
+                    f"{taches if taches else 'Non renseigné'}"
+                )
+
+                st.write(
                     f"**CACES :** "
                     f"{caces if caces else 'Aucun'}"
                 )
@@ -514,8 +550,8 @@ elif page == "🏢 Importer une fiche de poste":
     st.title("🏢 Importer une fiche de poste")
 
     fichier = st.file_uploader(
-        "Sélectionnez une fiche de poste (PDF)",
-        type=["pdf"],
+        "Sélectionnez une fiche de poste (PDF ou Word)",
+        type=["pdf", "docx"],
     )
 
     if fichier is not None:
@@ -526,7 +562,7 @@ elif page == "🏢 Importer une fiche de poste":
 
             st.error(
                 "Impossible d'extraire le texte de cette fiche "
-                "de poste (fichier scanné ?)."
+                "de poste (document scanné ou vide ?)."
             )
 
         else:
@@ -539,11 +575,19 @@ elif page == "🏢 Importer une fiche de poste":
                 texte
             )
 
+            taches_detectees = ", ".join(
+                extraire_taches(texte)
+            )
+
             caces_detectes = extraire_caces(
                 texte
             )
 
             permis_detectes = extraire_permis(
+                texte
+            )
+
+            vip_sir_detecte = detecter_vip_sir(
                 texte
             )
 
@@ -572,6 +616,14 @@ elif page == "🏢 Importer une fiche de poste":
                     value=competences_detectees,
                 )
 
+                taches = st.text_area(
+                    "Tâches à réaliser",                    value=taches_detectees,
+                    help=(
+                        "Détectées automatiquement dans la fiche "
+                        "de poste. Vous pouvez corriger ou compléter."
+                    ),
+                )
+
                 caces = st.text_input(
                     "CACES requis",
                     value=caces_detectes,
@@ -580,6 +632,37 @@ elif page == "🏢 Importer une fiche de poste":
                 permis = st.text_input(
                     "Permis requis",
                     value=permis_detectes,
+                )
+
+                vip_sir = st.selectbox(
+                    "Suivi médical requis",
+                    [
+                        "",
+                        "VIP",
+                        "SIR",
+                        "VIP + SIR",
+                    ],
+                    index=(
+                        [
+                            "",
+                            "VIP",
+                            "SIR",
+                            "VIP + SIR",
+                        ].index(vip_sir_detecte)
+                        if vip_sir_detecte
+                        in [
+                            "",
+                            "VIP",
+                            "SIR",
+                            "VIP + SIR",
+                        ]
+                        else 0
+                    ),
+                    help=(
+                        "VIP = Visite Infirmier Périodique. "
+                        "SIR = Suivi Individuel Renforcé "
+                        "(postes à risques)."
+                    ),
                 )
 
                 valider = st.form_submit_button(
@@ -607,6 +690,8 @@ elif page == "🏢 Importer une fiche de poste":
                             caces,
                             permis,
                             texte,
+                            taches,
+                            vip_sir,
                         )
 
                         st.success(
@@ -682,6 +767,8 @@ elif page == "📁 Postethèque":
             entreprise = poste_item.get("entreprise") or ""
             intitule = poste_item.get("poste") or ""
             competences = poste_item.get("competences") or ""
+            taches = poste_item.get("taches") or ""
+            vip_sir = poste_item.get("vip_sir") or ""
             caces = poste_item.get("caces") or ""
             permis = poste_item.get("permis") or ""
             date_creation = (
@@ -744,6 +831,11 @@ elif page == "📁 Postethèque":
                 )
 
                 st.write(
+                    f"**Tâches à réaliser :** "
+                    f"{taches if taches else 'Non renseigné'}"
+                )
+
+                st.write(
                     f"**CACES requis :** "
                     f"{caces if caces else 'Aucun'}"
                 )
@@ -751,6 +843,11 @@ elif page == "📁 Postethèque":
                 st.write(
                     f"**Permis requis :** "
                     f"{permis if permis else 'Non renseigné'}"
+                )
+
+                st.write(
+                    f"**Suivi médical :** "
+                    f"{vip_sir if vip_sir else 'Non renseigné'}"
                 )
 
                 st.caption(
@@ -843,7 +940,6 @@ elif page == "🔍 Matching":
 
         else:
 
-            poste_texte = poste.get("texte") or ""
             poste_nom = poste.get("poste") or ""
             entreprise_nom = poste.get("entreprise") or ""
 
@@ -851,24 +947,20 @@ elif page == "🔍 Matching":
 
             for cv in cvs:
 
-                cv_id = cv.get("id")
-                candidat = cv.get("candidat") or ""
-                cv_texte = cv.get("texte") or ""
-
-                score, mots_communs, metier_cv, _ = (
-                    calculer_score(
-                        cv_texte,
-                        poste_texte,
-                    )
+                resultat_matching = calculer_score(
+                    cv,
+                    poste,
                 )
 
                 resultats.append(
                     {
-                        "cv_id": cv_id,
-                        "candidat": candidat,
-                        "metier": metier_cv,
-                        "score": score,
-                        "mots_communs": mots_communs,
+                        "cv_id": cv.get("id"),
+                        "candidat": cv.get("candidat") or "",
+                        "metier": resultat_matching["metier_cv"],
+                        "score": resultat_matching["score"],
+                        "explication": resultat_matching[
+                            "explication"
+                        ],
                     }
                 )
 
@@ -894,14 +986,11 @@ elif page == "🔍 Matching":
                         min(r["score"], 100) / 100
                     )
 
-                    if r["mots_communs"]:
+                    for ligne_explication in r["explication"]:
 
-                        st.caption(
-                            "Mots-clés en commun : "
-                            + ", ".join(
-                                r["mots_communs"][:20]
-                            )
-                        )
+                        st.write(ligne_explication)
+
+                    st.markdown("---")
 
                     statut = st.selectbox(
                         "Statut de la candidature",
