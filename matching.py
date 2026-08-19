@@ -1,34 +1,231 @@
 from metiers import detecter_metier
 
 
-def calculer_score(cv_text, poste_text):
+# ============================================================
+# PONDERATION DU SCORE
+# ============================================================
+
+POIDS_METIER = 25
+POIDS_TACHES = 30
+POIDS_COMPETENCES = 20
+POIDS_CACES = 15
+POIDS_PERMIS = 10
+
+# Total = 100
+
+
+def _liste_depuis_champ(champ):
     """
-    Matching intelligent entre un CV et une fiche de poste.
+    Transforme un champ texte stocké en base (chaîne séparée
+    par des virgules) en liste de valeurs nettoyées.
     """
 
-    cv_words = set(cv_text.split())
-    poste_words = set(poste_text.split())
+    if not champ:
+        return []
 
-    if len(poste_words) == 0:
-        return 0, [], "Non détecté", "Non détecté"
+    return [
+        valeur.strip().lower()
+        for valeur in champ.split(",")
+        if valeur.strip()
+    ]
 
-    mots_communs = cv_words.intersection(poste_words)
 
-    score_mots = len(mots_communs) / len(poste_words) * 100
+def calculer_score(cv, poste):
+    """
+    Calcule un score de compatibilité pondéré entre un CV
+    et une fiche de poste.
 
-    metier_cv = detecter_metier(cv_text)
-    metier_poste = detecter_metier(poste_text)
+    cv, poste : dictionnaires issus de Supabase, avec au
+    minimum les clés "texte", et idéalement "metier",
+    "competences", "taches", "caces", "permis".
 
-    bonus = 0
+    Retourne un dictionnaire :
+    {
+        "score": int (0-100),
+        "explication": [liste de lignes ✅ / ⚠️ / ℹ️],
+        "metier_cv": str,
+        "metier_poste": str,
+    }
+    """
 
-    if metier_cv == metier_poste and metier_cv != "Non détecté":
-        bonus = 25
+    cv_texte = cv.get("texte") or ""
+    poste_texte = poste.get("texte") or ""
 
-    score_final = min(score_mots + bonus, 100)
+    metier_cv = cv.get("metier") or detecter_metier(cv_texte)
+    metier_poste = detecter_metier(poste_texte)
 
-    return (
-        round(score_final),
-        sorted(mots_communs),
-        metier_cv,
-        metier_poste
+    explication = []
+
+    # --------------------------------------------------
+    # METIER
+    # --------------------------------------------------
+
+    metier_ok = (
+        metier_cv == metier_poste
+        and metier_cv != "Non détecté"
     )
+
+    if metier_ok:
+        score_metier = POIDS_METIER
+
+        explication.append(
+            f"✅ Métier correspondant ({metier_cv})"
+        )
+
+    else:
+        score_metier = 0
+
+        explication.append(
+            "⚠️ Métier différent "
+            f"(CV : {metier_cv} / Poste : {metier_poste})"
+        )
+
+    # --------------------------------------------------
+    # TACHES
+    # --------------------------------------------------
+
+    taches_poste = _liste_depuis_champ(poste.get("taches"))
+    taches_cv = _liste_depuis_champ(cv.get("taches"))
+
+    taches_communes = [
+        t for t in taches_poste if t in taches_cv
+    ]
+
+    taches_manquantes = [
+        t for t in taches_poste if t not in taches_cv
+    ]
+
+    if taches_poste:
+
+        score_taches = (
+            len(taches_communes)
+            / len(taches_poste)
+            * POIDS_TACHES
+        )
+
+        if taches_communes:
+
+            explication.append(
+                f"✅ {len(taches_communes)}/"
+                f"{len(taches_poste)} tâches déjà "
+                "réalisées par le candidat"
+            )
+
+        else:
+
+            explication.append(
+                "⚠️ Aucune des tâches demandées "
+                "n'a été retrouvée dans le CV"
+            )
+
+        if taches_manquantes:
+
+            explication.append(
+                "⚠️ Tâches non retrouvées : "
+                + ", ".join(taches_manquantes)
+            )
+
+    else:
+
+        score_taches = 0
+
+        explication.append(
+            "ℹ️ Aucune tâche renseignée sur la fiche de poste"
+        )
+
+    # --------------------------------------------------
+    # COMPETENCES
+    # --------------------------------------------------
+
+    competences_poste = _liste_depuis_champ(
+        poste.get("competences")
+    )
+
+    competences_cv = _liste_depuis_champ(
+        cv.get("competences")
+    )
+
+    competences_communes = [
+        c for c in competences_poste if c in competences_cv
+    ]
+
+    competences_manquantes = [
+        c for c in competences_poste
+        if c not in competences_cv
+    ]
+
+    if competences_poste:
+
+        score_competences = (
+            len(competences_communes)
+            / len(competences_poste)
+            * POIDS_COMPETENCES
+        )
+
+        explication.append(
+            f"✅ {len(competences_communes)}/"
+            f"{len(competences_poste)} compétences "
+            "requises présentes"
+        )
+
+        if competences_manquantes:
+
+            explication.append(
+                "⚠️ Compétence(s) demandée(s) non trouvée(s) : "
+                + ", ".join(competences_manquantes)
+            )
+
+    else:
+
+        score_competences = 0
+
+        explication.append(
+            "ℹ️ Aucune compétence renseignée sur la fiche de poste"
+        )
+
+    # --------------------------------------------------
+    # CACES
+    # --------------------------------------------------
+
+    caces_poste = _liste_depuis_champ(poste.get("caces"))
+    caces_cv = _liste_depuis_champ(cv.get("caces"))
+
+    if not caces_poste:
+
+        score_caces = POIDS_CACES
+
+        explication.append(
+            "ℹ️ Aucun CACES requis pour ce poste"
+        )
+
+    else:
+
+        caces_communs = [
+            c for c in caces_poste if c in caces_cv
+        ]
+
+        score_caces = (
+            len(caces_communs)
+            / len(caces_poste)
+            * POIDS_CACES
+        )
+
+        if len(caces_communs) == len(caces_poste):
+
+            explication.append(
+                "✅ CACES requis présent(s) "
+                f"({', '.join(caces_poste)})"
+            )
+
+        elif caces_communs:
+
+            explication.append(
+                "⚠️ CACES partiellement présent(s) "
+                f"({', '.join(caces_communs)} sur "
+                f"{', '.join(caces_poste)} requis)"
+            )
+
+        else:
+
+            explication.append(
+                "⚠️ CACES requis absent du CV "
