@@ -159,6 +159,139 @@ def nettoyer_texte(texte):
 
 
 # ============================================================
+# LECTURE CIBLEE DE LA FICHE DE POSTE
+# (uniquement : entreprise, intitulé du poste, tâches)
+# ============================================================
+
+LIBELLES_CIBLES = {
+    "entreprise": r"nom\s+de\s+l['’]entreprise\s*:?",
+    "poste": r"intitulé\s+du\s+poste\s*:?",
+    "taches": r"liste\s+des\s+tâches\s+propos[ée]es\s*:?",
+}
+
+
+def _capturer_lignes_apres_libelle(texte, motif_libelle, autres_motifs):
+    """
+    Cherche un libellé dans le texte et renvoie la (ou les)
+    ligne(s) qui suivent, jusqu'à une ligne vide ou jusqu'à
+    ce qu'une AUTRE rubrique ciblée soit rencontrée.
+    """
+
+    correspondance = re.search(
+        motif_libelle,
+        texte,
+        flags=re.IGNORECASE,
+    )
+
+    if not correspondance:
+        return []
+
+    apres = texte[correspondance.end():]
+
+    lignes_capturees = []
+
+    for ligne in apres.split("\n"):
+
+        ligne_nettoyee = ligne.strip()
+
+        if not ligne_nettoyee:
+
+            if lignes_capturees:
+                break
+
+            continue
+
+        est_une_autre_rubrique = False
+
+        for motif in autres_motifs:
+
+            if re.match(
+                motif,
+                ligne_nettoyee,
+                flags=re.IGNORECASE,
+            ):
+                est_une_autre_rubrique = True
+                break
+
+        if est_une_autre_rubrique:
+            break
+
+        lignes_capturees.append(ligne_nettoyee)
+
+        if len(lignes_capturees) >= 8:
+            break
+
+    return lignes_capturees
+
+
+def extraire_fiche_poste_ciblee(texte):
+    """
+    Recherche UNIQUEMENT 3 informations dans la fiche de
+    poste, à partir de la structure connue du formulaire
+    ID'EES INTERIM :
+
+    - Nom de l'entreprise
+    - Intitulé du poste
+    - Liste des tâches proposées
+
+    Aucune autre rubrique n'est devinée. Si une information
+    n'est pas trouvée, le champ correspondant reste vide et
+    le drapeau "_trouvee"/"_trouve" associé passe à False —
+    à l'appelant de prévenir l'utilisateur plutôt que
+    d'inventer une valeur.
+    """
+
+    resultat_vide = {
+        "entreprise": "",
+        "poste": "",
+        "taches": "",
+        "entreprise_trouvee": False,
+        "poste_trouve": False,
+        "taches_trouvees": False,
+    }
+
+    if not texte:
+        return resultat_vide
+
+    tous_motifs = list(LIBELLES_CIBLES.values())
+
+    lignes_entreprise = _capturer_lignes_apres_libelle(
+        texte,
+        LIBELLES_CIBLES["entreprise"],
+        tous_motifs,
+    )
+
+    lignes_poste = _capturer_lignes_apres_libelle(
+        texte,
+        LIBELLES_CIBLES["poste"],
+        tous_motifs,
+    )
+
+    lignes_taches = _capturer_lignes_apres_libelle(
+        texte,
+        LIBELLES_CIBLES["taches"],
+        tous_motifs,
+    )
+
+    # Entreprise et intitulé de poste : une seule ligne suffit
+    entreprise = lignes_entreprise[0] if lignes_entreprise else ""
+    poste = lignes_poste[0] if lignes_poste else ""
+
+    # Tâches : on garde chaque ligne, séparées par des virgules
+    # (format attendu par le moteur de matching)
+    taches = ", ".join(lignes_taches)
+
+    return {
+        "entreprise": entreprise,
+        "poste": poste,
+        "taches": taches,
+        "entreprise_trouvee": bool(entreprise),
+        "poste_trouve": bool(poste),
+        "taches_trouvees": bool(taches),
+    }
+
+
+# ============================================================
 # GÉNÉRATION DE PRÉSENTATION CANDIDAT
 # ============================================================
 
