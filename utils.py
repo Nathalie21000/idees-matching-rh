@@ -1,52 +1,31 @@
-"""
-Utilitaires d'extraction PDF / DOCX.
-
-Version V9 :
-- conserve les retours à la ligne ;
-- ne transforme plus le texte en minuscules avant l'analyse ;
-- lecture PDF texte avec pdfplumber ;
-- lecture DOCX paragraphes + tableaux ;
-- extraction structurée du modèle de fiche de poste ;
-- préparation pour l'OCR ultérieur.
-"""
-
-import io
-import re
-import unicodedata
-
 import pdfplumber
 import docx
-
-from metiers import analyser_fiche_poste
+import re
 
 
 # ============================================================
-# NORMALISATION
+# EXTRACTION DE TEXTE (PDF + WORD)
 # ============================================================
 
-def normaliser_texte(texte):
-    """Nettoie un texte sans détruire sa structure ligne par ligne."""
-    if not texte:
-        return ""
-
-    texte = texte.replace("\r\n", "\n").replace("\r", "\n")
-    texte = texte.replace("\xa0", " ")
-
-    lignes = []
-    for ligne in texte.split("\n"):
-        ligne = re.sub(r"[ \t]+", " ", ligne).strip()
-        lignes.append(ligne)
-
-    return "\n".join(lignes).strip()
-
-
-def nettoyer_texte(texte):
+def extract_text(file):
     """
-    Ancienne fonction conservée pour compatibilité.
-    Elle nettoie sans mettre le texte en minuscules et sans supprimer
-    les retours à la ligne.
+    Extrait le texte d'un fichier PDF (.pdf) ou Word (.docx).
+
+    IMPORTANT :
+    On conserve les retours à la ligne afin de permettre
+    l'analyse structurée des fiches de poste.
     """
-    return normaliser_texte(texte)
+
+    nom_fichier = getattr(file, "name", "") or ""
+    nom_fichier_min = nom_fichier.lower()
+
+    if nom_fichier_min.endswith(".docx"):
+        texte = extraire_texte_docx(file)
+
+    else:
+        texte = extraire_texte_pdf(file)
+
+    return nettoyer_texte(texte)
 
 
 # ============================================================
@@ -54,149 +33,159 @@ def nettoyer_texte(texte):
 # ============================================================
 
 def extraire_texte_pdf(file):
-    """Extrait le texte d'un PDF en conservant autant que possible les lignes."""
-    texte_pages = []
+    """
+    Extrait le texte d'un PDF en conservant les lignes.
+    """
 
-    try:
-        file.seek(0)
-    except Exception:
-        pass
+    morceaux = []
 
     with pdfplumber.open(file) as pdf:
+
         for page in pdf.pages:
+
             texte_page = page.extract_text(
                 x_tolerance=2,
-                y_tolerance=3,
-                layout=True,
-            ) or ""
+                y_tolerance=3
+            )
 
             if texte_page:
-                texte_pages.append(texte_page)
+                morceaux.append(texte_page)
 
-    return normaliser_texte("\n\n".join(texte_pages))
-
-
-def _extraire_mots_pdf(file):
-    """
-    Extrait les mots avec leurs coordonnées.
-    Utile pour les formulaires en colonnes.
-    """
-    try:
-        file.seek(0)
-    except Exception:
-        pass
-
-    pages = []
-
-    with pdfplumber.open(file) as pdf:
-        for page in pdf.pages:
-            mots = page.extract_words(
-                x_tolerance=2,
-                y_tolerance=3,
-                keep_blank_chars=False,
-            )
-            pages.append((page, mots))
-
-    return pages
+    return "\n".join(morceaux)
 
 
 # ============================================================
-# EXTRACTION DOCX
+# EXTRACTION WORD
 # ============================================================
 
 def extraire_texte_docx(file):
     """
-    Lit paragraphes et tableaux.
-    Chaque cellule est conservée sur ses propres lignes.
+    Extrait le contenu d'un document Word.
+
+    Les paragraphes et les tableaux sont conservés avec
+    leurs retours à la ligne.
+
+    C'est particulièrement important pour les fiches
+    de poste qui utilisent des tableaux.
     """
-    try:
-        file.seek(0)
-    except Exception:
-        pass
 
     document = docx.Document(file)
+
     morceaux = []
 
+    # --------------------------------------------------------
+    # PARAGRAPHES
+    # --------------------------------------------------------
+
     for paragraphe in document.paragraphs:
-        if paragraphe.text and paragraphe.text.strip():
-            morceaux.append(paragraphe.text.strip())
+
+        texte = paragraphe.text.strip()
+
+        if texte:
+            morceaux.append(texte)
+
+    # --------------------------------------------------------
+    # TABLEAUX
+    # --------------------------------------------------------
 
     for table in document.tables:
+
         for ligne in table.rows:
+
             cellules = []
+
             for cellule in ligne.cells:
-                contenu = cellule.text.strip()
-                if contenu:
-                    cellules.append(contenu)
+
+                texte_cellule = cellule.text.strip()
+
+                if texte_cellule:
+                    cellules.append(texte_cellule)
 
             if cellules:
-                morceaux.append("\n".join(cellules))
+                morceaux.append(
+                    "\n".join(cellules)
+                )
 
-    return normaliser_texte("\n".join(morceaux))
-
-
-# ============================================================
-# EXTRACTION GENERALE
-# ============================================================
-
-def extract_text(file):
-    """
-    Extrait le texte d'un PDF ou DOCX.
-
-    PDF scanné :
-    si aucun texte n'est disponible, la fonction retourne "".
-    L'OCR sera ajouté dans une étape séparée afin de ne pas casser
-    la version actuelle.
-    """
-    nom_fichier = getattr(file, "name", "") or ""
-    extension = nom_fichier.lower().rsplit(".", 1)[-1] if "." in nom_fichier else ""
-
-    if extension == "docx":
-        return extraire_texte_docx(file)
-
-    if extension == "pdf":
-        return extraire_texte_pdf(file)
-
-    # Compatibilité : tenter le PDF par défaut.
-    return extraire_texte_pdf(file)
+    return "\n".join(morceaux)
 
 
 # ============================================================
-# FICHE DE POSTE STRUCTUREE
+# NETTOYAGE DU TEXTE
 # ============================================================
 
-def extraire_fiche_poste(file):
+def nettoyer_texte(texte):
     """
-    Extrait puis analyse une fiche de poste.
+    Nettoie le texte sans supprimer les retours à la ligne.
 
-    Pour le modèle texte/DOCX :
-        texte -> analyse structurée.
-
-    Pour un PDF :
-        on tente d'abord le texte PDF.
-        Si le PDF contient du texte, on utilise la même analyse structurée.
-
-    Cette fonction est volontairement séparée de extract_text afin de
-    pouvoir ajouter l'OCR ensuite sans modifier app.py.
+    IMPORTANT :
+    Ne surtout pas transformer les retours à la ligne en espaces.
+    Ils sont nécessaires pour analyser les rubriques des fiches
+    de poste.
     """
-    texte = extract_text(file)
 
     if not texte:
-        return {
-            "texte": "",
-            "analyse": analyser_fiche_poste(""),
-            "ocr_necessaire": True,
-        }
+        return ""
 
-    return {
-        "texte": texte,
-        "analyse": analyser_fiche_poste(texte),
-        "ocr_necessaire": False,
-    }
+    # Normalisation des retours à la ligne
+    texte = texte.replace("\r\n", "\n")
+    texte = texte.replace("\r", "\n")
+
+    # Suppression des espaces inutiles en fin de ligne
+    lignes = []
+
+    for ligne in texte.split("\n"):
+
+        ligne = re.sub(
+            r"[ \t]+",
+            " ",
+            ligne
+        ).strip()
+
+        if ligne:
+            lignes.append(ligne)
+
+    texte = "\n".join(lignes)
+
+    # Espaces multiples éventuels
+    texte = re.sub(
+        r"[ ]{2,}",
+        " ",
+        texte
+    )
+
+    return texte.strip()
 
 
 # ============================================================
-# PRESENTATION CANDIDAT
+# TEXTE NORMALISÉ POUR LES RECHERCHES
+# ============================================================
+
+def texte_normalise(texte):
+    """
+    Produit une version aplatie du texte uniquement pour
+    les recherches génériques.
+
+    Cette fonction NE doit PAS remplacer le texte structuré.
+    """
+
+    if not texte:
+        return ""
+
+    resultat = texte.lower()
+
+    resultat = resultat.replace("\n", " ")
+
+    resultat = re.sub(
+        r"\s+",
+        " ",
+        resultat
+    )
+
+    return resultat.strip()
+
+
+# ============================================================
+# GÉNÉRATION PRÉSENTATION CANDIDAT
 # ============================================================
 
 def generer_presentation(
@@ -206,8 +195,9 @@ def generer_presentation(
     caces,
     permis,
     entreprise,
-    agence,
+    agence
 ):
+
     texte = f"""
 Objet : Proposition de candidature – {metier}
 
@@ -235,4 +225,4 @@ ID'EES Intérim
 Agence de {agence}
 """
 
-    return texte.strip()
+    return texte
