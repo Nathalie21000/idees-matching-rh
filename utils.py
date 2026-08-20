@@ -1,34 +1,60 @@
-import pdfplumber
-import docx
+"""
+Utilitaires d'extraction PDF / DOCX.
+
+Version spéciale pour la fiche de poste ID'EES INTERIM.
+
+Le formulaire PDF utilisé par l'agence est un PDF interactif :
+- Texte 01 = Nom de l'entreprise
+- Texte 02 = Intitulé du poste
+- Texte 03 = Liste des tâches proposées
+
+On lit directement les champs du formulaire lorsque ceux-ci
+sont présents. C'est beaucoup plus fiable que de deviner les
+valeurs à partir du texte extrait.
+"""
+
+import io
 import re
 
+import pdfplumber
+import docx
+from pypdf import PdfReader
+
+from metiers import analyser_fiche_poste
+
 
 # ============================================================
-# EXTRACTION DE TEXTE
-# PDF + WORD
+# NORMALISATION
 # ============================================================
 
-def extract_text(file):
-    """
-    Extrait le texte d'un fichier PDF ou Word (.docx).
+def normaliser_texte(texte):
+    """Nettoie le texte sans supprimer les retours à la ligne."""
 
-    Le texte conserve les retours à la ligne afin de permettre
-    l'analyse précise des rubriques de la fiche de poste.
-    """
+    if not texte:
+        return ""
 
-    nom_fichier = getattr(file, "name", "") or ""
-    nom_fichier_min = nom_fichier.lower()
+    texte = texte.replace("\r\n", "\n")
+    texte = texte.replace("\r", "\n")
+    texte = texte.replace("\xa0", " ")
 
-    if nom_fichier_min.endswith(".docx"):
-        texte = extraire_texte_docx(file)
+    lignes = []
 
-    elif nom_fichier_min.endswith(".pdf"):
-        texte = extraire_texte_pdf(file)
+    for ligne in texte.split("\n"):
 
-    else:
-        texte = ""
+        ligne = re.sub(
+            r"[ \t]+",
+            " ",
+            ligne,
+        ).strip()
 
-    return nettoyer_texte(texte)
+        lignes.append(ligne)
+
+    return "\n".join(lignes).strip()
+
+
+def nettoyer_texte(texte):
+    """Compatibilité avec les anciennes versions de utils.py."""
+    return normaliser_texte(texte)
 
 
 # ============================================================
@@ -36,9 +62,12 @@ def extract_text(file):
 # ============================================================
 
 def extraire_texte_pdf(file):
-    """
-    Extrait le texte d'un PDF page par page.
-    """
+    """Extrait le texte natif du PDF."""
+
+    try:
+        file.seek(0)
+    except Exception:
+        pass
 
     texte_pages = []
 
@@ -48,15 +77,22 @@ def extraire_texte_pdf(file):
 
             for page in pdf.pages:
 
-                texte_page = page.extract_text()
+                texte_page = page.extract_text(
+                    x_tolerance=2,
+                    y_tolerance=3,
+                    layout=True,
+                ) or ""
 
                 if texte_page:
                     texte_pages.append(texte_page)
 
     except Exception:
+
         return ""
 
-    return "\n".join(texte_pages)
+    return normaliser_texte(
+        "\n\n".join(texte_pages)
+    )
 
 
 # ============================================================
@@ -64,26 +100,12 @@ def extraire_texte_pdf(file):
 # ============================================================
 
 def extraire_texte_docx(file):
-    """
-    Extrait le contenu d'un document Word.
+    """Extrait les paragraphes et tableaux d'un DOCX."""
 
-    IMPORTANT :
-    Les cellules des tableaux sont volontairement séparées
-    par des retours à la ligne et NON par " | ".
-
-    Cela permet de conserver la structure :
-
-        Nom de l'entreprise
-        ABC ENTREPRISE
-
-        Intitulé du poste
-        Préparateur de commandes
-
-        Liste des tâches proposées
-        Tâche 1
-        Tâche 2
-        Tâche 3
-    """
+    try:
+        file.seek(0)
+    except Exception:
+        pass
 
     morceaux = []
 
@@ -91,10 +113,7 @@ def extraire_texte_docx(file):
 
         document = docx.Document(file)
 
-        # ----------------------------------------------------
-        # PARAGRAPHES
-        # ----------------------------------------------------
-
+        # Paragraphes
         for paragraphe in document.paragraphs:
 
             texte = paragraphe.text.strip()
@@ -102,561 +121,491 @@ def extraire_texte_docx(file):
             if texte:
                 morceaux.append(texte)
 
-        # ----------------------------------------------------
-        # TABLEAUX
-        # ----------------------------------------------------
-
+        # Tableaux
         for table in document.tables:
 
             for ligne in table.rows:
 
                 for cellule in ligne.cells:
 
-                    texte_cellule = cellule.text.strip()
+                    contenu = cellule.text.strip()
 
-                    if texte_cellule:
+                    if contenu:
 
-                        # On conserve les lignes présentes
-                        # dans chaque cellule.
-                        lignes_cellule = texte_cellule.splitlines()
+                        for sous_ligne in contenu.splitlines():
 
-                        for ligne_cellule in lignes_cellule:
+                            sous_ligne = sous_ligne.strip()
 
-                            ligne_cellule = ligne_cellule.strip()
-
-                            if ligne_cellule:
-                                morceaux.append(ligne_cellule)
+                            if sous_ligne:
+                                morceaux.append(
+                                    sous_ligne
+                                )
 
     except Exception:
+
         return ""
 
-    return "\n".join(morceaux)
+    return normaliser_texte(
+        "\n".join(morceaux)
+    )
 
 
 # ============================================================
-# NETTOYAGE DU TEXTE
+# EXTRACTION GENERALE
 # ============================================================
 
-def nettoyer_texte(texte):
+def extract_text(file):
     """
-    Nettoyage léger du texte.
-
-    Les retours à la ligne sont volontairement conservés.
+    Extrait le texte d'un PDF ou d'un DOCX.
     """
 
-    if not texte:
-        return ""
+    nom_fichier = getattr(
+        file,
+        "name",
+        "",
+    ) or ""
 
-    texte = texte.replace("\r\n", "\n")
-    texte = texte.replace("\r", "\n")
-    texte = texte.replace("\xa0", " ")
+    extension = (
+        nom_fichier.lower().rsplit(".", 1)[-1]
+        if "." in nom_fichier
+        else ""
+    )
 
-    # Nettoyage des espaces sans supprimer les lignes
-    texte = re.sub(r"[ \t]+", " ", texte)
+    if extension == "docx":
 
-    # Nettoyage des lignes vides multiples
-    texte = re.sub(r"\n\s*\n+", "\n\n", texte)
+        return extraire_texte_docx(file)
 
-    return texte.strip()
+    if extension == "pdf":
 
-
-# ============================================================
-# NORMALISATION POUR COMPARER LES LIBELLES
-# ============================================================
-
-def _normaliser_ligne(ligne):
-    """
-    Normalise une ligne uniquement pour la comparaison
-    des intitulés de rubriques.
-
-    Exemple :
-
-    "Liste des tâches proposées :"
-    devient :
-    "liste des taches proposees"
-    """
-
-    if not ligne:
-        return ""
-
-    ligne = ligne.lower().strip()
-
-    # Accents
-    remplacements = {
-        "à": "a",
-        "â": "a",
-        "ä": "a",
-        "á": "a",
-        "é": "e",
-        "è": "e",
-        "ê": "e",
-        "ë": "e",
-        "î": "i",
-        "ï": "i",
-        "ô": "o",
-        "ö": "o",
-        "ù": "u",
-        "û": "u",
-        "ü": "u",
-        "ÿ": "y",
-        "ç": "c",
-        "œ": "oe",
-    }
-
-    for ancien, nouveau in remplacements.items():
-        ligne = ligne.replace(ancien, nouveau)
-
-    ligne = re.sub(r"[^a-z0-9 ]", " ", ligne)
-    ligne = re.sub(r"\s+", " ", ligne)
-
-    return ligne.strip()
-
-
-# ============================================================
-# RECONNAISSANCE DES LIBELLES
-# ============================================================
-
-def _est_libelle_entreprise(ligne):
-    """
-    Reconnaît les différentes formes possibles du libellé
-    entreprise.
-    """
-
-    normalisee = _normaliser_ligne(ligne)
-
-    formes = [
-        "nom de l entreprise",
-        "nom de entreprise",
-        "entreprise",
-        "entreprise cliente",
-        "nom entreprise",
-    ]
-
-    return normalisee in formes
-
-
-def _est_libelle_poste(ligne):
-    """
-    Reconnaît le libellé exact de l'intitulé du poste.
-    """
-
-    normalisee = _normaliser_ligne(ligne)
-
-    formes = [
-        "intitule du poste",
-        "intitule poste",
-        "poste",
-    ]
-
-    return normalisee in formes
-
-
-def _est_libelle_taches(ligne):
-    """
-    Reconnaît notamment le libellé utilisé dans la fiche
-    ID'EES :
-
-        Liste des tâches proposées
-    """
-
-    normalisee = _normaliser_ligne(ligne)
-
-    formes = [
-        "liste des taches proposees",
-        "liste des taches a proposer",
-        "liste taches proposees",
-        "liste taches a proposer",
-        "taches proposees",
-        "taches a proposer",
-        "liste des taches",
-    ]
-
-    return normalisee in formes
-
-
-# ============================================================
-# AUTRES RUBRIQUES QUI PEUVENT TERMINER LA LISTE DES TÂCHES
-# ============================================================
-
-def _est_autre_rubrique(ligne):
-    """
-    Détecte les rubriques qui apparaissent généralement
-    après la liste des tâches.
-
-    Cela évite de récupérer toute la fiche de poste
-    dans "Tâches à réaliser".
-    """
-
-    normalisee = _normaliser_ligne(ligne)
-
-    rubriques = [
-        "conditions de travail",
-        "conditions de travail liees au poste",
-        "competences",
-        "competences requises",
-        "profil",
-        "profil recherche",
-        "profil recherche",
-        "qualification",
-        "qualifications",
-        "formation",
-        "experience",
-        "experiences",
-        "horaires",
-        "remuneration",
-        "salaire",
-        "avantages",
-        "lieu de travail",
-        "adresse",
-        "type de contrat",
-        "contrat",
-        "duree du contrat",
-        "date de debut",
-        "date de debut souhaitee",
-        "permis",
-        "caces",
-        "habilitation",
-        "suivi medical",
-        "vip",
-        "sir",
-    ]
-
-    return normalisee in rubriques
-
-
-# ============================================================
-# EXTRAIRE VALEUR APRES UN LIBELLE
-# ============================================================
-
-def _valeur_apres_libelle_meme_ligne(ligne, type_libelle):
-    """
-    Permet de gérer un document où le libellé et la valeur
-    sont sur la même ligne.
-
-    Exemple :
-
-        Nom de l'entreprise : ABC
-
-    ou :
-
-        Intitulé du poste : Préparateur de commandes
-    """
-
-    if not ligne:
-        return ""
-
-    if type_libelle == "entreprise":
-
-        motifs = [
-            r"nom\s+de\s+l['’]entreprise\s*[:\-]\s*(.+)$",
-            r"nom\s+de\s+l['’]\s+entreprise\s*[:\-]\s*(.+)$",
-            r"entreprise\s+cliente\s*[:\-]\s*(.+)$",
-        ]
-
-    elif type_libelle == "poste":
-
-        motifs = [
-            r"intitul[ée]\s+du\s+poste\s*[:\-]\s*(.+)$",
-            r"intitul[ée]\s+poste\s*[:\-]\s*(.+)$",
-        ]
-
-    else:
-
-        motifs = [
-            r"liste\s+des\s+t[âa]ches\s+propos[ée]es\s*[:\-]\s*(.+)$",
-            r"liste\s+des\s+t[âa]ches\s+a\s+proposer\s*[:\-]\s*(.+)$",
-        ]
-
-    for motif in motifs:
-
-        correspondance = re.search(
-            motif,
-            ligne,
-            flags=re.IGNORECASE,
-        )
-
-        if correspondance:
-
-            valeur = correspondance.group(1).strip()
-
-            if valeur:
-                return valeur
+        return extraire_texte_pdf(file)
 
     return ""
 
 
 # ============================================================
-# RECHERCHE D'UN LIBELLE
+# LECTURE DES CHAMPS DU FORMULAIRE PDF ID'EES
 # ============================================================
 
-def _trouver_ligne_libelle(lignes, type_libelle):
+def _valeur_champ_pdf(
+    reader,
+    nom_champ,
+):
     """
-    Retourne l'index de la ligne contenant le libellé.
-    """
-
-    for index, ligne in enumerate(lignes):
-
-        if type_libelle == "entreprise":
-
-            if _est_libelle_entreprise(ligne):
-                return index
-
-        elif type_libelle == "poste":
-
-            if _est_libelle_poste(ligne):
-                return index
-
-        elif type_libelle == "taches":
-
-            if _est_libelle_taches(ligne):
-                return index
-
-    return None
-
-
-# ============================================================
-# CAPTURE D'UNE VALEUR APRES UN LIBELLE
-# ============================================================
-
-def _capturer_valeur(lignes, index, type_libelle):
-    """
-    Capture la valeur située après un libellé.
-
-    Fonctionne dans les deux cas :
-
-    1. Libellé puis valeur sur la ligne suivante.
-    2. Libellé et valeur sur la même ligne.
+    Retourne la valeur d'un champ AcroForm PDF.
     """
 
-    if index is None:
-        return []
+    try:
 
-    # --------------------------------------------------------
-    # CAS : valeur présente sur la même ligne
-    # --------------------------------------------------------
+        champs = reader.get_fields() or {}
 
-    valeur_meme_ligne = _valeur_apres_libelle_meme_ligne(
-        lignes[index],
-        type_libelle,
-    )
+        champ = champs.get(nom_champ)
 
-    if valeur_meme_ligne:
+        if not champ:
+            return ""
 
-        return [valeur_meme_ligne]
+        valeur = champ.get("/V")
 
-    # --------------------------------------------------------
-    # CAS : valeur sur les lignes suivantes
-    # --------------------------------------------------------
+        if valeur is None:
+            return ""
 
-    valeurs = []
+        return str(valeur).strip()
 
-    for position in range(index + 1, len(lignes)):
+    except Exception:
 
-        ligne = lignes[position].strip()
-
-        if not ligne:
-            continue
-
-        # Si une nouvelle rubrique ciblée apparaît,
-        # on s'arrête.
-        if (
-            _est_libelle_entreprise(ligne)
-            or _est_libelle_poste(ligne)
-            or _est_libelle_taches(ligne)
-        ):
-            break
-
-        # Pour les tâches, on s'arrête aussi devant
-        # une rubrique suivante classique.
-        if (
-            type_libelle == "taches"
-            and _est_autre_rubrique(ligne)
-        ):
-            break
-
-        valeurs.append(ligne)
-
-        # ----------------------------------------------------
-        # ENTREPRISE
-        # ----------------------------------------------------
-
-        if type_libelle == "entreprise":
-
-            # Une seule ligne suffit.
-            break
-
-        # ----------------------------------------------------
-        # POSTE
-        # ----------------------------------------------------
-
-        if type_libelle == "poste":
-
-            # Une seule ligne suffit.
-            break
-
-        # ----------------------------------------------------
-        # TÂCHES
-        # ----------------------------------------------------
-
-        if type_libelle == "taches":
-
-            # On continue volontairement pour récupérer
-            # toutes les tâches, même s'il y a 3, 4, 5...
-            # lignes.
-            if len(valeurs) >= 30:
-                break
-
-    return valeurs
+        return ""
 
 
-# ============================================================
-# EXTRACTION CIBLEE DE LA FICHE DE POSTE
-# ============================================================
-
-def extraire_fiche_poste_ciblee(texte):
+def _lire_formulaire_idees(file):
     """
-    Extrait UNIQUEMENT les trois informations importantes :
+    Lit directement les champs texte du formulaire
+    ID'EES INTERIM.
 
-    - nom de l'entreprise ;
-    - intitulé du poste ;
-    - liste complète des tâches proposées.
+    Correspondance vérifiée sur le formulaire :
 
-    Aucun métier ou compétence n'est deviné ici.
-
-    Retour :
-
-    {
-        "entreprise": "...",
-        "poste": "...",
-        "taches": "...",
-        "entreprise_trouvee": True/False,
-        "poste_trouve": True/False,
-        "taches_trouvees": True/False
-    }
+        Texte 01 = entreprise
+        Texte 02 = poste
+        Texte 03 = tâches
     """
 
     resultat = {
         "entreprise": "",
         "poste": "",
         "taches": "",
-        "entreprise_trouvee": False,
-        "poste_trouve": False,
-        "taches_trouvees": False,
     }
 
-    if not texte:
-        return resultat
+    try:
 
-    # --------------------------------------------------------
-    # Préparation des lignes
-    # --------------------------------------------------------
+        file.seek(0)
 
-    lignes = []
+        contenu = file.read()
 
-    for ligne in texte.split("\n"):
+        file.seek(0)
 
-        ligne = ligne.strip()
-
-        if ligne:
-            lignes.append(ligne)
-
-    if not lignes:
-        return resultat
-
-    # --------------------------------------------------------
-    # RECHERCHE DES 3 RUBRIQUES
-    # --------------------------------------------------------
-
-    index_entreprise = _trouver_ligne_libelle(
-        lignes,
-        "entreprise",
-    )
-
-    index_poste = _trouver_ligne_libelle(
-        lignes,
-        "poste",
-    )
-
-    index_taches = _trouver_ligne_libelle(
-        lignes,
-        "taches",
-    )
-
-    # --------------------------------------------------------
-    # ENTREPRISE
-    # --------------------------------------------------------
-
-    valeurs_entreprise = _capturer_valeur(
-        lignes,
-        index_entreprise,
-        "entreprise",
-    )
-
-    if valeurs_entreprise:
+        reader = PdfReader(
+            io.BytesIO(contenu)
+        )
 
         resultat["entreprise"] = (
-            valeurs_entreprise[0].strip()
+            _valeur_champ_pdf(
+                reader,
+                "Texte 01",
+            )
         )
-
-        resultat["entreprise_trouvee"] = True
-
-    # --------------------------------------------------------
-    # POSTE
-    # --------------------------------------------------------
-
-    valeurs_poste = _capturer_valeur(
-        lignes,
-        index_poste,
-        "poste",
-    )
-
-    if valeurs_poste:
 
         resultat["poste"] = (
-            valeurs_poste[0].strip()
+            _valeur_champ_pdf(
+                reader,
+                "Texte 02",
+            )
         )
 
-        resultat["poste_trouve"] = True
-
-    # --------------------------------------------------------
-    # TÂCHES
-    # --------------------------------------------------------
-
-    valeurs_taches = _capturer_valeur(
-        lignes,
-        index_taches,
-        "taches",
-    )
-
-    if valeurs_taches:
-
-        # Nettoyage des lignes
-        taches_propres = []
-
-        for tache in valeurs_taches:
-
-            tache = tache.strip()
-
-            if not tache:
-                continue
-
-            # Évite les doublons exacts
-            if tache not in taches_propres:
-                taches_propres.append(tache)
-
-        resultat["taches"] = ", ".join(
-            taches_propres
+        resultat["taches"] = (
+            _valeur_champ_pdf(
+                reader,
+                "Texte 03",
+            )
         )
 
-        resultat["taches_trouvees"] = bool(
-            taches_propres
-        )
+    except Exception:
+
+        return resultat
 
     return resultat
 
 
 # ============================================================
-# GÉNÉRATION DE PRÉSENTATION CANDIDAT
+# FALLBACK POUR PDF APLATI
+# ============================================================
+
+def _extraire_champ_par_zone_pdf(
+    file,
+    champ,
+):
+    """
+    Fallback si le PDF a été aplati.
+
+    Les coordonnées correspondent au formulaire
+    GJP-A-019-07 que nous avons retrouvé.
+    """
+
+    zones = {
+
+        # x0, y0, x1, y1
+        "entreprise": (
+            32,
+            669,
+            252,
+            698,
+        ),
+
+        "poste": (
+            31,
+            609,
+            251,
+            639,
+        ),
+
+        "taches": (
+            271,
+            612,
+            562,
+            694,
+        ),
+    }
+
+    if champ not in zones:
+        return ""
+
+    x0, y0, x1, y1 = zones[champ]
+
+    try:
+
+        file.seek(0)
+
+        with pdfplumber.open(file) as pdf:
+
+            page = pdf.pages[0]
+
+            top = page.height - y1
+            bottom = page.height - y0
+
+            mots = page.extract_words(
+                x_tolerance=2,
+                y_tolerance=3,
+                keep_blank_chars=False,
+            )
+
+            mots_zone = []
+
+            for mot in mots:
+
+                if (
+                    mot["x1"] >= x0
+                    and mot["x0"] <= x1
+                    and mot["bottom"] >= top
+                    and mot["top"] <= bottom
+                ):
+                    mots_zone.append(mot)
+
+            if not mots_zone:
+                return ""
+
+            lignes = []
+
+            ligne_courante = []
+
+            dernier_top = None
+
+            for mot in sorted(
+                mots_zone,
+                key=lambda m: (
+                    m["top"],
+                    m["x0"],
+                ),
+            ):
+
+                if (
+                    dernier_top is not None
+                    and abs(
+                        mot["top"]
+                        - dernier_top
+                    ) > 5
+                ):
+
+                    if ligne_courante:
+
+                        lignes.append(
+                            " ".join(
+                                ligne_courante
+                            )
+                        )
+
+                    ligne_courante = []
+
+                ligne_courante.append(
+                    mot["text"]
+                )
+
+                dernier_top = mot["top"]
+
+            if ligne_courante:
+
+                lignes.append(
+                    " ".join(
+                        ligne_courante
+                    )
+                )
+
+            return "\n".join(
+                ligne.strip()
+                for ligne in lignes
+                if ligne.strip()
+            ).strip()
+
+    except Exception:
+
+        return ""
+
+
+# ============================================================
+# ANALYSE CLASSIQUE POUR AUTRES DOCUMENTS
+# ============================================================
+
+def _analyse_fallback_texte(texte):
+
+    try:
+
+        return analyser_fiche_poste(
+            texte
+        )
+
+    except Exception:
+
+        return {
+            "entreprise": "",
+            "intitule": "",
+            "taches": "",
+            "competences": "",
+            "vip_sir": "",
+        }
+
+
+# ============================================================
+# EXTRACTION FICHE DE POSTE
+# ============================================================
+
+def extraire_fiche_poste(file):
+    """
+    Extrait une fiche de poste.
+
+    Pour le formulaire PDF ID'EES :
+    lecture directe des champs Texte 01, Texte 02 et Texte 03.
+
+    Si le PDF a été aplati :
+    lecture des zones correspondant aux champs.
+
+    Pour un DOCX :
+    analyse textuelle classique.
+
+    IMPORTANT :
+    on ne déduit plus les compétences, CACES ou permis
+    à partir de tout le texte de la fiche ID'EES.
+    """
+
+    nom_fichier = getattr(
+        file,
+        "name",
+        "",
+    ) or ""
+
+    extension = (
+        nom_fichier.lower().rsplit(
+            ".",
+            1,
+        )[-1]
+        if "." in nom_fichier
+        else ""
+    )
+
+    # ========================================================
+    # PDF
+    # ========================================================
+
+    if extension == "pdf":
+
+        champs = _lire_formulaire_idees(
+            file
+        )
+
+        entreprise = (
+            champs["entreprise"].strip()
+        )
+
+        poste = (
+            champs["poste"].strip()
+        )
+
+        taches = (
+            champs["taches"].strip()
+        )
+
+        # ----------------------------------------------------
+        # FALLBACK SI CHAMPS VIDES
+        # ----------------------------------------------------
+
+        if not entreprise:
+
+            entreprise = (
+                _extraire_champ_par_zone_pdf(
+                    file,
+                    "entreprise",
+                )
+            )
+
+        if not poste:
+
+            poste = (
+                _extraire_champ_par_zone_pdf(
+                    file,
+                    "poste",
+                )
+            )
+
+        if not taches:
+
+            taches = (
+                _extraire_champ_par_zone_pdf(
+                    file,
+                    "taches",
+                )
+            )
+
+        texte = extract_text(file)
+
+        # ----------------------------------------------------
+        # SI ON A TROUVE AU MOINS UN DES 3 CHAMPS
+        # ----------------------------------------------------
+
+        if (
+            entreprise
+            or poste
+            or taches
+        ):
+
+            texte_cible = (
+                "Nom de l'entreprise\n"
+                + entreprise
+                + "\n\n"
+                + "Intitulé du poste\n"
+                + poste
+                + "\n\n"
+                + "Liste des tâches proposées\n"
+                + taches
+            ).strip()
+
+            analyse = {
+
+                "entreprise": entreprise,
+
+                "intitule": poste,
+
+                "taches": taches,
+
+                # Volontairement vide.
+                "competences": "",
+
+                "vip_sir": "",
+            }
+
+            return {
+                "texte": (
+                    texte_cible
+                    if texte_cible
+                    else texte
+                ),
+
+                "analyse": analyse,
+
+                "ocr_necessaire": False,
+            }
+
+    # ========================================================
+    # DOCX / AUTRE FALLBACK
+    # ========================================================
+
+    texte = extract_text(file)
+
+    if not texte:
+
+        return {
+
+            "texte": "",
+
+            "analyse": (
+                _analyse_fallback_texte("")
+            ),
+
+            "ocr_necessaire": True,
+        }
+
+    analyse = (
+        _analyse_fallback_texte(
+            texte
+        )
+    )
+
+    return {
+
+        "texte": texte,
+
+        "analyse": analyse,
+
+        "ocr_necessaire": False,
+    }
+
+
+# ============================================================
+# PRESENTATION CANDIDAT
 # ============================================================
 
 def generer_presentation(
@@ -669,8 +618,7 @@ def generer_presentation(
     agence,
 ):
     """
-    Génère la présentation d'un candidat destinée
-    à l'entreprise cliente.
+    Génère la présentation d'un candidat.
     """
 
     texte = f"""
