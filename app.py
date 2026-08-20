@@ -526,7 +526,8 @@ elif page == "🏢 Importer une fiche de poste":
                 st.warning(
                     "La rubrique « Nom de l'entreprise » n'a pas été "
                     "identifiée automatiquement."
-                )            if not poste_detecte:
+                )           
+            if not poste_detecte:
                 st.warning(
                     "La rubrique « Intitulé du poste » n'a pas été "
                     "identifiée automatiquement."
