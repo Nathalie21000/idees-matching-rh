@@ -254,10 +254,14 @@ def repartition_suivi(agence):
     compteurs = {}
 
     for ligne in lignes:
+
         statut = ligne.get("statut")
 
         if statut:
-            compteurs[statut] = compteurs.get(statut, 0) + 1
+
+            compteurs[statut] = (
+                compteurs.get(statut, 0) + 1
+            )
 
     return compteurs
 
@@ -388,7 +392,10 @@ def lister_suivi(agence):
 # MODIFIER LE STATUT D'UNE CANDIDATURE
 # ============================================================
 
-def modifier_statut_suivi(suivi_id, nouveau_statut):
+def modifier_statut_suivi(
+    suivi_id,
+    nouveau_statut
+):
     resultat = (
         supabase
         .table("suivi")
@@ -467,6 +474,7 @@ def statistiques_par_semaine(agence):
     statistiques = {}
 
     for ligne in lignes:
+
         date_creation = ligne.get("date_creation")
 
         if not date_creation:
@@ -474,6 +482,123 @@ def statistiques_par_semaine(agence):
 
         jour = str(date_creation)[:10]
 
-        statistiques[jour] = statistiques.get(jour, 0) + 1
+        statistiques[jour] = (
+            statistiques.get(jour, 0) + 1
+        )
 
     return list(statistiques.items())
+
+
+# ============================================================
+# TABLEAU DE BORD DZ
+# ============================================================
+
+def statistiques_dz(agences):
+    """
+    Récupère les statistiques de toutes les agences.
+
+    Cette fonction ne modifie aucune donnée.
+    Elle lit simplement les tables CV, postes et suivi
+    afin de construire le tableau de bord régional.
+    """
+
+    resultats = {}
+
+    # --------------------------------------------------------
+    # Initialisation
+    # --------------------------------------------------------
+
+    for agence in agences:
+
+        resultats[agence] = {
+            "cv": 0,
+            "postes": 0,
+            "candidatures": 0,
+            "entretiens": 0,
+            "recrutements": 0,
+            "clients": 0,
+            "prospects": 0,
+        }
+
+    # --------------------------------------------------------
+    # CV
+    # --------------------------------------------------------
+
+    resultat_cv = (
+        supabase
+        .table("cv")
+        .select("agence")
+        .execute()
+    )
+
+    for ligne in resultat_cv.data or []:
+
+        nom_agence = ligne.get("agence")
+
+        if nom_agence in resultats:
+
+            resultats[nom_agence]["cv"] += 1
+
+    # --------------------------------------------------------
+    # POSTES
+    # --------------------------------------------------------
+
+    resultat_postes = (
+        supabase
+        .table("postes")
+        .select("agence")
+        .execute()
+    )
+
+    for ligne in resultat_postes.data or []:
+
+        nom_agence = ligne.get("agence")
+
+        if nom_agence in resultats:
+
+            resultats[nom_agence]["postes"] += 1
+
+    # --------------------------------------------------------
+    # SUIVI
+    # --------------------------------------------------------
+
+    resultat_suivi = (
+        supabase
+        .table("suivi")
+        .select(
+            "agence, statut, type_entreprise"
+        )
+        .execute()
+    )
+
+    for ligne in resultat_suivi.data or []:
+
+        nom_agence = ligne.get("agence")
+
+        if nom_agence not in resultats:
+            continue
+
+        resultats[nom_agence]["candidatures"] += 1
+
+        statut = ligne.get("statut")
+        type_entreprise = ligne.get(
+            "type_entreprise"
+        )
+
+        if statut == "Entretien programmé":
+
+            resultats[nom_agence]["entretiens"] += 1
+
+        if statut == "Recruté":
+
+            resultats[nom_agence]["recrutements"] += 1
+
+        if type_entreprise == "🟢 Client":
+
+            resultats[nom_agence]["clients"] += 1
+
+        if type_entreprise == "🟠 Prospect":
+
+            resultats[nom_agence]["prospects"] += 1
+
+    return resultats
