@@ -48,7 +48,7 @@ from utils import (
 
 st.set_page_config(
     page_title="ID'EES INTERIM - Assistant IA RH",
-    page_icon="🧑‍💼",
+    page_icon="logo.png",
     layout="wide",
 )
 
@@ -181,9 +181,12 @@ def extraire_permis(texte):
 # BARRE LATERALE
 # ============================================================
 
-st.sidebar.title(
-    "🧑‍💼 ID'EES INTERIM"
+st.sidebar.image(
+    "logo.png",
+    width=180,
 )
+
+st.sidebar.title("🧑‍💼 ID'EES INTERIM")
 
 agence = st.sidebar.selectbox(
     "Agence",
