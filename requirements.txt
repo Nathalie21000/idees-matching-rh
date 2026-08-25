@@ -3,3 +3,4 @@ pdfplumber
 scikit-learn
 supabase
 python-docx
+pytesseract
