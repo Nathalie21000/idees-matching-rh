@@ -4,3 +4,4 @@ scikit-learn
 supabase
 python-docx
 pytesseract
+Pillow
