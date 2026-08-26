@@ -1,10 +1,17 @@
 import pytesseract
-from PIL import Image
 
-print("Tesseract détecté :")
-print(pytesseract.get_tesseract_version())
+print("=== TEST TESSERACT ===")
 
-print("\nLangues disponibles :")
-print(pytesseract.get_languages(config=""))
+try:
+    version = pytesseract.get_tesseract_version()
+    print("Version Tesseract :", version)
+except Exception as e:
+    print("ERREUR TESSERACT :", e)
 
-print("\nOCR prêt.")
+try:
+    langues = pytesseract.get_languages(config="")
+    print("Langues disponibles :", langues)
+except Exception as e:
+    print("ERREUR LANGUES :", e)
+
+print("=== FIN DU TEST ===")
