@@ -211,44 +211,15 @@ def nettoyer_texte(texte):
 
 
 # ============================================================
-# RUBRIQUES CIBLÉES
-# ============================================================
-
-MOTIF_ENTREPRISE = re.compile(
-    r"^\s*nom\s+de\s+l['’]?entreprise\s*:?\s*$",
-    re.IGNORECASE
-)
-
-MOTIF_POSTE = re.compile(
-    r"^\s*intitul[ée]?\s+du\s+poste\s*:?\s*$",
-    re.IGNORECASE
-)
-
-MOTIF_TACHES = re.compile(
-    r"^\s*liste\s+des\s+t[âa]ches\s+propos[ée]es\s*:?\s*$",
-    re.IGNORECASE
-)
-
-
-# ============================================================
-# NORMALISATION D'UNE LIGNE POUR L'OCR
+# NORMALISATION D'UNE LIGNE
 # ============================================================
 
 def _normaliser_ligne(ligne):
     """
-    Normalise une ligne uniquement pour permettre
+    Normalise une ligne uniquement pour faciliter
     la reconnaissance des libellés.
 
-    Les petits caractères parasites produits par OCR
-    en début de ligne sont supprimés.
-
-    Exemple :
-
-        | Nom de l'entreprise :
-
-    devient :
-
-        nom de l'entreprise :
+    Le texte original est conservé pour les valeurs.
     """
 
     if not ligne:
@@ -259,9 +230,9 @@ def _normaliser_ligne(ligne):
     ligne = ligne.replace("’", "'")
 
     # Suppression des caractères parasites fréquents
-    # avant un libellé OCR.
+    # produits par OCR en début de ligne.
     ligne = re.sub(
-        r"^[|¦Il1\[\]{}()<>]+[\s]*",
+        r"^[|¦]+[\s]*",
         "",
         ligne
     )
@@ -276,62 +247,59 @@ def _normaliser_ligne(ligne):
 
 
 # ============================================================
-# RECONNAISSANCE DU LIBELLÉ ENTREPRISE
+# RECONNAISSANCE DES LIBELLÉS
 # ============================================================
 
 def _est_libelle_entreprise(ligne):
+    """
+    Reconnaît le libellé 'Nom de l'entreprise'
+    même si l'OCR ajoute des caractères parasites.
+    """
 
     texte = _normaliser_ligne(ligne)
 
     return bool(
-        re.match(
-            r"^nom\s+de\s+l['’]?entreprise\s*:?.*$",
+        re.search(
+            r"\bnom\s+de\s+l['’]?entreprise\b",
             texte,
             re.IGNORECASE
         )
     )
 
-
-# ============================================================
-# RECONNAISSANCE DU LIBELLÉ POSTE
-# ============================================================
 
 def _est_libelle_poste(ligne):
+    """
+    Reconnaît le libellé 'Intitulé du poste'.
+    """
 
     texte = _normaliser_ligne(ligne)
 
     return bool(
-        re.match(
-            r"^intitul[ée]?\s+du\s+poste\s*:?.*$",
+        re.search(
+            r"\bintitul[ée]?\s+du\s+poste\b",
             texte,
             re.IGNORECASE
         )
     )
 
-
-# ============================================================
-# RECONNAISSANCE DU LIBELLÉ TÂCHES
-# ============================================================
 
 def _est_libelle_taches(ligne):
+    """
+    Reconnaît le libellé 'Liste des tâches proposées'.
+    """
 
     texte = _normaliser_ligne(ligne)
 
     return bool(
-        re.match(
-            r"^liste\s+des\s+t[âa]ches\s+propos[ée]es\s*:?.*$",
+        re.search(
+            r"\bliste\s+des\s+t[âa]ches\s+propos[ée]es\b",
             texte,
             re.IGNORECASE
         )
     )
 
 
-# ============================================================
-# LIBELLÉ CIBLE
-# ============================================================
-
 def _est_un_libelle_cible(ligne):
-
     return (
         _est_libelle_entreprise(ligne)
         or _est_libelle_poste(ligne)
@@ -340,152 +308,416 @@ def _est_un_libelle_cible(ligne):
 
 
 # ============================================================
-# EXTRACTION APRÈS UN LIBELLÉ
+# NETTOYAGE D'UNE VALEUR OCR
 # ============================================================
 
-def _extraire_valeur_apres_libelle(
-    lignes,
-    index_libelle,
-    type_information
-):
+def _nettoyer_valeur_ocr(valeur):
     """
-    Récupère la valeur située après un libellé.
+    Nettoie les caractères de tableau ou d'OCR autour
+    d'une valeur.
 
     Exemple :
-
-        Nom de l'entreprise :
-        COLAS
-
-    ou :
-
-        Nom de l'entreprise : COLAS
-
-    Pour les tâches, toutes les lignes suivantes
-    sont conservées jusqu'à la prochaine rubrique cible.
+        '| COLAS |'
+    devient :
+        'COLAS'
     """
 
-    ligne_libelle = lignes[index_libelle].strip()
+    if not valeur:
+        return ""
+
+    valeur = valeur.strip()
+
+    valeur = re.sub(
+        r"^[|¦]+",
+        "",
+        valeur
+    )
+
+    valeur = re.sub(
+        r"[|¦]+$",
+        "",
+        valeur
+    )
+
+    return valeur.strip()
+
+
+# ============================================================
+# EXTRACTION D'UNE VALEUR SUR UNE LIGNE
+# ============================================================
+
+def _extraire_apres_texte(
+    ligne,
+    motif
+):
+    """
+    Extrait ce qui se trouve après un libellé sur une même ligne.
+    """
+
+    resultat = re.search(
+        motif,
+        ligne,
+        flags=re.IGNORECASE
+    )
+
+    if not resultat:
+        return ""
+
+    valeur = ligne[resultat.end():]
+
+    valeur = valeur.strip()
+
+    valeur = valeur.lstrip(":|¦ ")
+
+    return _nettoyer_valeur_ocr(valeur)
+
+
+# ============================================================
+# EXTRACTION SPÉCIALE DU FORMULAIRE OCR
+# ============================================================
+
+def _extraire_formulaire_ocr(lignes):
+    """
+    Gère la structure particulière du formulaire scanné.
+
+    Le formulaire peut présenter les rubriques en colonnes :
+
+        | Nom de l'entreprise : | | Liste des tâches proposées : | |
+        | COLAS                  | Maçonnerie VRD                 |
+        |                        | Pose de bordures               |
+        ...
+        Intitulé du poste:
+        ...
+        OUVRIER VRD CONDUCTEUR D ENGINS
+
+    Cette fonction cherche donc les informations
+    sans supposer qu'une rubrique occupe une ligne entière.
+    """
+
+    resultat = {
+        "entreprise": "",
+        "poste": "",
+        "taches": "",
+        "entreprise_trouvee": False,
+        "poste_trouve": False,
+        "taches_trouvees": False,
+    }
 
     # ========================================================
-    # VALEUR SUR LA MÊME LIGNE
+    # ÉTAPE 1 : rechercher la ligne contenant les en-têtes
     # ========================================================
 
-    if type_information == "entreprise":
+    index_entete_colonnes = None
 
-        valeur = re.sub(
-            r"^\s*[|¦Il1\[\]{}()<>]*\s*"
-            r"nom\s+de\s+l['’]?entreprise\s*:?\s*",
-            "",
-            ligne_libelle,
-            flags=re.IGNORECASE
-        ).strip()
+    for index, ligne in enumerate(lignes):
 
-        if valeur:
-            return valeur
+        normalisee = _normaliser_ligne(ligne)
 
-    elif type_information == "poste":
-
-        valeur = re.sub(
-            r"^\s*[|¦Il1\[\]{}()<>]*\s*"
-            r"intitul[ée]?\s+du\s+poste\s*:?\s*",
-            "",
-            ligne_libelle,
-            flags=re.IGNORECASE
-        ).strip()
-
-        if valeur:
-            return valeur
-
-    elif type_information == "taches":
-
-        valeur = re.sub(
-            r"^\s*[|¦Il1\[\]{}()<>]*\s*"
-            r"liste\s+des\s+t[âa]ches\s+propos[ée]es\s*:?\s*",
-            "",
-            ligne_libelle,
-            flags=re.IGNORECASE
-        ).strip()
-
-        if valeur:
-            return valeur
+        if (
+            "nom de l'entreprise" in normalisee
+            and "liste des tâches proposées" in normalisee
+        ):
+            index_entete_colonnes = index
+            break
 
     # ========================================================
-    # VALEUR(S) SUR LES LIGNES SUIVANTES
+    # ÉTAPE 2 : formulaire en colonnes
     # ========================================================
 
-    valeurs = []
-
-    for i in range(
-        index_libelle + 1,
-        len(lignes)
-    ):
-
-        ligne = lignes[i].strip()
+    if index_entete_colonnes is not None:
 
         # ----------------------------------------------------
-        # Ligne vide
+        # Ligne suivante : entreprise + première tâche
         # ----------------------------------------------------
 
-        if not ligne:
+        for index in range(
+            index_entete_colonnes + 1,
+            min(
+                index_entete_colonnes + 8,
+                len(lignes)
+            )
+        ):
 
-            if valeurs:
+            ligne = lignes[index]
+
+            # ------------------------------------------------
+            # Entreprise
+            # ------------------------------------------------
+
+            if not resultat["entreprise"]:
+
+                # Recherche de COLAS ou autre valeur située
+                # après le libellé entreprise.
+                valeur = _extraire_apres_texte(
+                    ligne,
+                    r"nom\s+de\s+l['’]?entreprise\s*:?"
+                )
+
+                if valeur:
+
+                    resultat["entreprise"] = valeur
+                    resultat["entreprise_trouvee"] = True
+
+                else:
+
+                    # Dans le formulaire OCR, la valeur peut
+                    # être sur la ligne suivante.
+                    #
+                    # On évite cependant de prendre une tâche
+                    # comme nom d'entreprise.
+                    if (
+                        not _est_libelle_taches(ligne)
+                        and not _est_libelle_poste(ligne)
+                    ):
+
+                        morceaux = [
+                            _nettoyer_valeur_ocr(
+                                morceau
+                            )
+                            for morceau in ligne.split("|")
+                            if morceau.strip()
+                        ]
+
+                        if morceaux:
+
+                            premiere_valeur = morceaux[0]
+
+                            if (
+                                premiere_valeur
+                                and premiere_valeur.lower()
+                                not in (
+                                    "nom de l'entreprise",
+                                    "liste des tâches proposées"
+                                )
+                            ):
+
+                                resultat["entreprise"] = (
+                                    premiere_valeur
+                                )
+
+                                resultat[
+                                    "entreprise_trouvee"
+                                ] = True
+
+            # ------------------------------------------------
+            # Tâches
+            # ------------------------------------------------
+
+            # On récupère les lignes situées dans la zone
+            # des tâches jusqu'à l'arrivée du poste.
+            if not resultat["taches_trouvees"]:
+
+                morceaux = [
+                    _nettoyer_valeur_ocr(morceau)
+                    for morceau in ligne.split("|")
+                    if morceau.strip()
+                ]
+
+                # Si plusieurs colonnes sont présentes,
+                # la deuxième colonne correspond aux tâches.
+                if len(morceaux) >= 2:
+
+                    for morceau in morceaux[1:]:
+
+                        if not morceau:
+                            continue
+
+                        texte_morceau = morceau.lower()
+
+                        if (
+                            "liste des tâches proposées"
+                            in texte_morceau
+                        ):
+                            continue
+
+                        if (
+                            "nom de l'entreprise"
+                            in texte_morceau
+                        ):
+                            continue
+
+                        if (
+                            "intitulé du poste"
+                            in texte_morceau
+                        ):
+                            continue
+
+                        resultat["taches"] = (
+                            morceau
+                            if not resultat["taches"]
+                            else resultat["taches"]
+                            + ", "
+                            + morceau
+                        )
+
+            # ------------------------------------------------
+            # Arrêt lorsqu'on arrive au poste
+            # ------------------------------------------------
+
+            if _est_libelle_poste(ligne):
+
                 break
 
+        # ----------------------------------------------------
+        # Recherche plus large des tâches après l'en-tête
+        # ----------------------------------------------------
+
+        taches = []
+
+        for index in range(
+            index_entete_colonnes + 1,
+            len(lignes)
+        ):
+
+            ligne = lignes[index]
+
+            # Le poste marque la fin de la zone.
+            if _est_libelle_poste(ligne):
+                break
+
+            # On ignore les lignes de libellés.
+            normalisee = _normaliser_ligne(ligne)
+
+            if (
+                "nom de l'entreprise" in normalisee
+                or "liste des tâches proposées" in normalisee
+            ):
+                continue
+
+            morceaux = [
+                _nettoyer_valeur_ocr(morceau)
+                for morceau in ligne.split("|")
+                if morceau.strip()
+            ]
+
+            # Pour une ligne avec deux colonnes,
+            # la deuxième partie est la tâche.
+            if len(morceaux) >= 2:
+
+                candidat_tache = morceaux[-1]
+
+                if candidat_tache:
+
+                    taches.append(candidat_tache)
+
+            elif len(morceaux) == 1:
+
+                morceau = morceaux[0]
+
+                # On ne prend pas une éventuelle valeur
+                # d'entreprise comme tâche.
+                if (
+                    morceau
+                    and morceau != resultat["entreprise"]
+                ):
+
+                    # On évite les lignes manifestement
+                    # étrangères à la rubrique.
+                    if len(morceau) > 2:
+
+                        taches.append(morceau)
+
+        # ----------------------------------------------------
+        # Nettoyage des tâches
+        # ----------------------------------------------------
+
+        taches_finales = []
+
+        for tache in taches:
+
+            tache = tache.strip()
+
+            if not tache:
+                continue
+
+            if tache in taches_finales:
+                continue
+
+            # On évite de capturer le libellé du poste
+            # ou des éléments manifestement étrangers.
+            if _est_libelle_poste(tache):
+                continue
+
+            taches_finales.append(tache)
+
+        if taches_finales:
+
+            resultat["taches"] = ", ".join(
+                taches_finales
+            )
+
+            resultat["taches_trouvees"] = True
+
+    # ========================================================
+    # ÉTAPE 3 : recherche du poste
+    # ========================================================
+
+    for index, ligne in enumerate(lignes):
+
+        if not _est_libelle_poste(ligne):
             continue
 
-        # ----------------------------------------------------
-        # Nouvelle rubrique cible
-        # ----------------------------------------------------
-
-        if _est_un_libelle_cible(ligne):
-
-            break
-
-        # ----------------------------------------------------
-        # ENTREPRISE
-        # ----------------------------------------------------
-
-        if type_information == "entreprise":
-
-            valeurs.append(ligne)
-
-            break
-
-        # ----------------------------------------------------
-        # POSTE
-        # ----------------------------------------------------
-
-        elif type_information == "poste":
-
-            valeurs.append(ligne)
-
-            break
-
-        # ----------------------------------------------------
-        # TÂCHES
-        # ----------------------------------------------------
-
-        elif type_information == "taches":
-
-            valeurs.append(ligne)
-
-    # ========================================================
-    # RÉSULTAT
-    # ========================================================
-
-    if type_information == "taches":
-
-        return ", ".join(
-            valeur.strip()
-            for valeur in valeurs
-            if valeur.strip()
+        # Valeur éventuellement sur la même ligne.
+        valeur = _extraire_apres_texte(
+            ligne,
+            r"intitul[ée]?\s+du\s+poste\s*:?"
         )
 
-    if valeurs:
+        if valeur:
 
-        return valeurs[0].strip()
+            resultat["poste"] = valeur
+            resultat["poste_trouve"] = True
+            break
 
-    return ""
+        # Sinon, chercher les lignes suivantes.
+        for suivant in range(
+            index + 1,
+            min(index + 5, len(lignes))
+        ):
+
+            candidat = lignes[suivant].strip()
+
+            if not candidat:
+                continue
+
+            if _est_un_libelle_cible(candidat):
+                break
+
+            # On ignore les éléments très courts ou manifestement
+            # issus d'une autre rubrique.
+            if len(candidat) >= 4:
+
+                morceaux = [
+                    _nettoyer_valeur_ocr(morceau)
+                    for morceau in candidat.split("|")
+                    if morceau.strip()
+                ]
+
+                # Si une seule valeur est présente,
+                # c'est très probablement l'intitulé.
+                if len(morceaux) == 1:
+
+                    resultat["poste"] = morceaux[0]
+                    resultat["poste_trouve"] = True
+                    break
+
+                # Si plusieurs colonnes sont présentes,
+                # on recherche une valeur suffisamment longue.
+                for morceau in morceaux:
+
+                    if len(morceau) >= 8:
+
+                        resultat["poste"] = morceau
+                        resultat["poste_trouve"] = True
+                        break
+
+                if resultat["poste_trouve"]:
+                    break
+
+        if resultat["poste_trouve"]:
+            break
+
+    return resultat
 
 
 # ============================================================
@@ -494,14 +726,14 @@ def _extraire_valeur_apres_libelle(
 
 def extraire_fiche_poste_ciblee(texte):
     """
-    Extrait UNIQUEMENT :
+    Extrait :
 
     1. Nom de l'entreprise
     2. Intitulé du poste
     3. Liste des tâches proposées
 
-    Aucun métier n'est déduit.
-    Aucune compétence n'est inventée.
+    La fonction tient compte de la structure particulière
+    des formulaires scannés en colonnes.
     """
 
     resultat = {
@@ -529,8 +761,17 @@ def extraire_fiche_poste_ciblee(texte):
     ]
 
     # ========================================================
-    # RECHERCHE DES TROIS RUBRIQUES
+    # TENTATIVE SPÉCIALE FORMULAIRE OCR
     # ========================================================
+
+    resultat = _extraire_formulaire_ocr(lignes)
+
+    # ========================================================
+    # SECOURS : EXTRACTION CLASSIQUE
+    # ========================================================
+
+    # Si une information n'a pas été trouvée,
+    # on applique l'ancienne méthode.
 
     index_entreprise = None
     index_poste = None
@@ -538,76 +779,192 @@ def extraire_fiche_poste_ciblee(texte):
 
     for index, ligne in enumerate(lignes):
 
-        if index_entreprise is None:
+        if (
+            index_entreprise is None
+            and _est_libelle_entreprise(ligne)
+        ):
 
-            if _est_libelle_entreprise(ligne):
+            index_entreprise = index
 
-                index_entreprise = index
-                continue
+        if (
+            index_poste is None
+            and _est_libelle_poste(ligne)
+        ):
 
-        if index_poste is None:
+            index_poste = index
 
-            if _est_libelle_poste(ligne):
+        if (
+            index_taches is None
+            and _est_libelle_taches(ligne)
+        ):
 
-                index_poste = index
-                continue
-
-        if index_taches is None:
-
-            if _est_libelle_taches(ligne):
-
-                index_taches = index
-                continue
+            index_taches = index
 
     # ========================================================
-    # ENTREPRISE
+    # ENTREPRISE - SECOURS
     # ========================================================
 
-    if index_entreprise is not None:
+    if (
+        not resultat["entreprise_trouvee"]
+        and index_entreprise is not None
+    ):
 
-        entreprise = _extraire_valeur_apres_libelle(
-            lignes,
-            index_entreprise,
-            "entreprise"
+        ligne = lignes[index_entreprise]
+
+        valeur = _extraire_apres_texte(
+            ligne,
+            r"nom\s+de\s+l['’]?entreprise\s*:?"
         )
 
-        if entreprise:
+        if valeur:
 
-            resultat["entreprise"] = entreprise
+            resultat["entreprise"] = valeur
             resultat["entreprise_trouvee"] = True
 
+        else:
+
+            for suivant in range(
+                index_entreprise + 1,
+                min(index_entreprise + 4, len(lignes))
+            ):
+
+                candidat = lignes[suivant].strip()
+
+                if not candidat:
+                    continue
+
+                if _est_libelle_poste(candidat):
+                    break
+
+                if _est_libelle_taches(candidat):
+                    continue
+
+                morceaux = [
+                    _nettoyer_valeur_ocr(morceau)
+                    for morceau in candidat.split("|")
+                    if morceau.strip()
+                ]
+
+                if morceaux:
+
+                    valeur = morceaux[0]
+
+                    if (
+                        valeur
+                        and valeur.lower()
+                        not in (
+                            "nom de l'entreprise",
+                            "liste des tâches proposées"
+                        )
+                    ):
+
+                        resultat["entreprise"] = valeur
+                        resultat["entreprise_trouvee"] = True
+                        break
+
     # ========================================================
-    # POSTE
+    # POSTE - SECOURS
     # ========================================================
 
-    if index_poste is not None:
+    if (
+        not resultat["poste_trouve"]
+        and index_poste is not None
+    ):
 
-        poste = _extraire_valeur_apres_libelle(
-            lignes,
-            index_poste,
-            "poste"
+        ligne = lignes[index_poste]
+
+        valeur = _extraire_apres_texte(
+            ligne,
+            r"intitul[ée]?\s+du\s+poste\s*:?"
         )
 
-        if poste:
+        if valeur:
 
-            resultat["poste"] = poste
+            resultat["poste"] = valeur
             resultat["poste_trouve"] = True
 
+        else:
+
+            for suivant in range(
+                index_poste + 1,
+                min(index_poste + 5, len(lignes))
+            ):
+
+                candidat = lignes[suivant].strip()
+
+                if not candidat:
+                    continue
+
+                if _est_un_libelle_cible(candidat):
+                    break
+
+                morceaux = [
+                    _nettoyer_valeur_ocr(morceau)
+                    for morceau in candidat.split("|")
+                    if morceau.strip()
+                ]
+
+                if len(morceaux) == 1:
+
+                    resultat["poste"] = morceaux[0]
+                    resultat["poste_trouve"] = True
+                    break
+
     # ========================================================
-    # TÂCHES
+    # TÂCHES - SECOURS
     # ========================================================
 
-    if index_taches is not None:
+    if (
+        not resultat["taches_trouvees"]
+        and index_taches is not None
+    ):
 
-        taches = _extraire_valeur_apres_libelle(
-            lignes,
-            index_taches,
-            "taches"
-        )
+        taches = []
+
+        for suivant in range(
+            index_taches + 1,
+            len(lignes)
+        ):
+
+            candidat = lignes[suivant].strip()
+
+            if not candidat:
+                if taches:
+                    break
+
+                continue
+
+            if _est_libelle_poste(candidat):
+                break
+
+            if _est_libelle_entreprise(candidat):
+                break
+
+            morceaux = [
+                _nettoyer_valeur_ocr(morceau)
+                for morceau in candidat.split("|")
+                if morceau.strip()
+            ]
+
+            for morceau in morceaux:
+
+                if not morceau:
+                    continue
+
+                if (
+                    morceau
+                    == resultat["entreprise"]
+                ):
+                    continue
+
+                taches.append(morceau)
 
         if taches:
 
-            resultat["taches"] = taches
+            resultat["taches"] = ", ".join(
+                dict.fromkeys(taches)
+            )
+
             resultat["taches_trouvees"] = True
 
     return resultat
