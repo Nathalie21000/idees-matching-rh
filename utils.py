@@ -14,17 +14,13 @@ def extract_text(file):
     Extrait le texte d'un fichier PDF ou Word (.docx).
 
     PDF :
-    - tente d'abord une extraction classique avec pdfplumber ;
-    - si une page ne contient pas de texte exploitable,
-      utilise Tesseract OCR sur cette page.
+    - utilise d'abord pdfplumber ;
+    - si aucune texte n'est trouvé sur une page,
+      utilise Tesseract OCR.
 
     DOCX :
     - lit les paragraphes ;
     - lit également les tableaux.
-
-    IMPORTANT :
-    L'extraction classique reste prioritaire.
-    L'OCR n'intervient qu'en secours pour les PDF scannés.
     """
 
     nom_fichier = getattr(file, "name", "") or ""
@@ -50,13 +46,9 @@ def extraire_texte_pdf(file):
     """
     Extrait le texte d'un PDF.
 
-    Fonctionnement :
-    1. lecture classique avec pdfplumber ;
-    2. si une page ne contient aucun texte,
-       OCR de cette page avec Tesseract.
-
-    Cela permet de conserver le fonctionnement actuel
-    des PDF normaux tout en prenant en charge les PDF scannés.
+    1. Tentative classique avec pdfplumber.
+    2. Si une page ne contient aucun texte,
+       utilisation de Tesseract OCR.
     """
 
     morceaux = []
@@ -65,10 +57,10 @@ def extraire_texte_pdf(file):
 
         with pdfplumber.open(file) as pdf:
 
-            for numero_page, page in enumerate(pdf.pages, start=1):
+            for page in pdf.pages:
 
                 # ------------------------------------------------
-                # 1. TENTATIVE D'EXTRACTION CLASSIQUE
+                # 1. EXTRACTION CLASSIQUE
                 # ------------------------------------------------
 
                 texte_page = page.extract_text(
@@ -83,7 +75,7 @@ def extraire_texte_pdf(file):
                     continue
 
                 # ------------------------------------------------
-                # 2. AUCUN TEXTE → OCR TESSERACT
+                # 2. OCR SI AUCUN TEXTE
                 # ------------------------------------------------
 
                 texte_ocr = extraire_page_avec_ocr(page)
@@ -104,29 +96,16 @@ def extraire_texte_pdf(file):
 
 def extraire_page_avec_ocr(page):
     """
-    Transforme une page PDF en image puis utilise Tesseract
-    avec le français.
-
-    L'OCR est volontairement limité au cas où l'extraction
-    classique de la page ne fournit aucun texte.
+    Convertit une page PDF en image puis utilise Tesseract
+    avec le modèle français.
     """
 
     try:
 
-        # Conversion de la page PDF en image haute résolution.
-        #
-        # 300 dpi est un bon compromis entre qualité OCR
-        # et temps de traitement.
         image_page = page.to_image(
             resolution=300
         ).original
 
-        # OCR français.
-        #
-        # PSM 6 :
-        # suppose un bloc de texte relativement uniforme,
-        # ce qui convient généralement aux formulaires,
-        # CV et fiches de poste.
         texte = pytesseract.image_to_string(
             image_page,
             lang="fra",
@@ -202,30 +181,26 @@ def extraire_texte_docx(file):
 
 def nettoyer_texte(texte):
     """
-    Nettoyage léger du texte.
+    Nettoyage léger.
 
     Les retours à la ligne sont conservés car ils sont
-    indispensables pour l'analyse des rubriques.
+    importants pour reconnaître les différentes rubriques.
     """
 
     if not texte:
         return ""
 
-    # Normalisation des retours à la ligne
     texte = texte.replace("\r\n", "\n")
     texte = texte.replace("\r", "\n")
 
-    # Espaces insécables
     texte = texte.replace("\xa0", " ")
 
-    # Espaces multiples sur une même ligne
     texte = re.sub(
         r"[ \t]+",
         " ",
         texte
     )
 
-    # Trop nombreuses lignes vides
     texte = re.sub(
         r"\n[ \t]*\n[ \t]*\n+",
         "\n\n",
@@ -238,17 +213,6 @@ def nettoyer_texte(texte):
 # ============================================================
 # RUBRIQUES CIBLÉES
 # ============================================================
-
-# IMPORTANT :
-# On ne cherche QUE ces trois informations.
-#
-# 1. Nom de l'entreprise
-# 2. Intitulé du poste
-# 3. Liste des tâches proposées
-#
-# Aucune compétence générique n'est ajoutée.
-# Aucun métier n'est inventé.
-# Aucun autre champ de la fiche n'est utilisé.
 
 MOTIF_ENTREPRISE = re.compile(
     r"^\s*nom\s+de\s+l['’]?entreprise\s*:?\s*$",
@@ -267,15 +231,24 @@ MOTIF_TACHES = re.compile(
 
 
 # ============================================================
-# NORMALISATION D'UNE LIGNE
+# NORMALISATION D'UNE LIGNE POUR L'OCR
 # ============================================================
 
 def _normaliser_ligne(ligne):
     """
-    Normalise une ligne uniquement pour faciliter
+    Normalise une ligne uniquement pour permettre
     la reconnaissance des libellés.
 
-    La valeur réellement extraite n'est pas modifiée.
+    Les petits caractères parasites produits par OCR
+    en début de ligne sont supprimés.
+
+    Exemple :
+
+        | Nom de l'entreprise :
+
+    devient :
+
+        nom de l'entreprise :
     """
 
     if not ligne:
@@ -285,17 +258,25 @@ def _normaliser_ligne(ligne):
 
     ligne = ligne.replace("’", "'")
 
+    # Suppression des caractères parasites fréquents
+    # avant un libellé OCR.
+    ligne = re.sub(
+        r"^[|¦Il1\[\]{}()<>]+[\s]*",
+        "",
+        ligne
+    )
+
     ligne = re.sub(
         r"\s+",
         " ",
         ligne
     )
 
-    return ligne
+    return ligne.strip()
 
 
 # ============================================================
-# RECONNAISSANCE DES LIBELLÉS
+# RECONNAISSANCE DU LIBELLÉ ENTREPRISE
 # ============================================================
 
 def _est_libelle_entreprise(ligne):
@@ -304,12 +285,16 @@ def _est_libelle_entreprise(ligne):
 
     return bool(
         re.match(
-            r"^nom\s+de\s+l['’]?entreprise\s*:?\s*$",
+            r"^nom\s+de\s+l['’]?entreprise\s*:?.*$",
             texte,
             re.IGNORECASE
         )
     )
 
+
+# ============================================================
+# RECONNAISSANCE DU LIBELLÉ POSTE
+# ============================================================
 
 def _est_libelle_poste(ligne):
 
@@ -317,12 +302,16 @@ def _est_libelle_poste(ligne):
 
     return bool(
         re.match(
-            r"^intitul[ée]?\s+du\s+poste\s*:?\s*$",
+            r"^intitul[ée]?\s+du\s+poste\s*:?.*$",
             texte,
             re.IGNORECASE
         )
     )
 
+
+# ============================================================
+# RECONNAISSANCE DU LIBELLÉ TÂCHES
+# ============================================================
 
 def _est_libelle_taches(ligne):
 
@@ -330,12 +319,16 @@ def _est_libelle_taches(ligne):
 
     return bool(
         re.match(
-            r"^liste\s+des\s+t[âa]ches\s+propos[ée]es\s*:?\s*$",
+            r"^liste\s+des\s+t[âa]ches\s+propos[ée]es\s*:?.*$",
             texte,
             re.IGNORECASE
         )
     )
 
+
+# ============================================================
+# LIBELLÉ CIBLE
+# ============================================================
 
 def _est_un_libelle_cible(ligne):
 
@@ -360,22 +353,15 @@ def _extraire_valeur_apres_libelle(
 
     Exemple :
 
-        Nom de l'entreprise
+        Nom de l'entreprise :
         COLAS
 
     ou :
 
         Nom de l'entreprise : COLAS
 
-    Pour les tâches :
-
-        Liste des tâches proposées
-        Maçonnerie VRD
-        Pose de bordures
-        Pose de tuyaux
-        Réglage et nivellement divers matériaux
-
-    Toutes les lignes de tâches sont conservées.
+    Pour les tâches, toutes les lignes suivantes
+    sont conservées jusqu'à la prochaine rubrique cible.
     """
 
     ligne_libelle = lignes[index_libelle].strip()
@@ -387,7 +373,8 @@ def _extraire_valeur_apres_libelle(
     if type_information == "entreprise":
 
         valeur = re.sub(
-            r"^\s*nom\s+de\s+l['’]?entreprise\s*:?\s*",
+            r"^\s*[|¦Il1\[\]{}()<>]*\s*"
+            r"nom\s+de\s+l['’]?entreprise\s*:?\s*",
             "",
             ligne_libelle,
             flags=re.IGNORECASE
@@ -399,7 +386,8 @@ def _extraire_valeur_apres_libelle(
     elif type_information == "poste":
 
         valeur = re.sub(
-            r"^\s*intitul[ée]?\s+du\s+poste\s*:?\s*",
+            r"^\s*[|¦Il1\[\]{}()<>]*\s*"
+            r"intitul[ée]?\s+du\s+poste\s*:?\s*",
             "",
             ligne_libelle,
             flags=re.IGNORECASE
@@ -411,7 +399,8 @@ def _extraire_valeur_apres_libelle(
     elif type_information == "taches":
 
         valeur = re.sub(
-            r"^\s*liste\s+des\s+t[âa]ches\s+propos[ée]es\s*:?\s*",
+            r"^\s*[|¦Il1\[\]{}()<>]*\s*"
+            r"liste\s+des\s+t[âa]ches\s+propos[ée]es\s*:?\s*",
             "",
             ligne_libelle,
             flags=re.IGNORECASE
@@ -445,10 +434,11 @@ def _extraire_valeur_apres_libelle(
             continue
 
         # ----------------------------------------------------
-        # Nouvelle rubrique ciblée
+        # Nouvelle rubrique cible
         # ----------------------------------------------------
 
         if _est_un_libelle_cible(ligne):
+
             break
 
         # ----------------------------------------------------
@@ -512,17 +502,6 @@ def extraire_fiche_poste_ciblee(texte):
 
     Aucun métier n'est déduit.
     Aucune compétence n'est inventée.
-
-    Retourne :
-
-    {
-        "entreprise": "...",
-        "poste": "...",
-        "taches": "...",
-        "entreprise_trouvee": True/False,
-        "poste_trouve": True/False,
-        "taches_trouvees": True/False,
-    }
     """
 
     resultat = {
