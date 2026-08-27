@@ -1,11 +1,12 @@
 import pdfplumber
 import docx
 import re
+import pytesseract
 
 
 # ============================================================
 # EXTRACTION DE TEXTE
-# PDF + WORD
+# PDF + WORD + OCR PDF SCANNÉ
 # ============================================================
 
 def extract_text(file):
@@ -13,12 +14,17 @@ def extract_text(file):
     Extrait le texte d'un fichier PDF ou Word (.docx).
 
     PDF :
-    - utilise pdfplumber
-    - conserve les retours à la ligne
+    - tente d'abord une extraction classique avec pdfplumber ;
+    - si une page ne contient pas de texte exploitable,
+      utilise Tesseract OCR sur cette page.
 
     DOCX :
-    - lit les paragraphes
-    - lit également les tableaux
+    - lit les paragraphes ;
+    - lit également les tableaux.
+
+    IMPORTANT :
+    L'extraction classique reste prioritaire.
+    L'OCR n'intervient qu'en secours pour les PDF scannés.
     """
 
     nom_fichier = getattr(file, "name", "") or ""
@@ -42,10 +48,15 @@ def extract_text(file):
 
 def extraire_texte_pdf(file):
     """
-    Extrait le texte d'un PDF avec pdfplumber.
+    Extrait le texte d'un PDF.
 
-    Les retours à la ligne sont conservés afin de permettre
-    l'analyse précise des rubriques de la fiche de poste.
+    Fonctionnement :
+    1. lecture classique avec pdfplumber ;
+    2. si une page ne contient aucun texte,
+       OCR de cette page avec Tesseract.
+
+    Cela permet de conserver le fonctionnement actuel
+    des PDF normaux tout en prenant en charge les PDF scannés.
     """
 
     morceaux = []
@@ -54,15 +65,32 @@ def extraire_texte_pdf(file):
 
         with pdfplumber.open(file) as pdf:
 
-            for page in pdf.pages:
+            for numero_page, page in enumerate(pdf.pages, start=1):
+
+                # ------------------------------------------------
+                # 1. TENTATIVE D'EXTRACTION CLASSIQUE
+                # ------------------------------------------------
 
                 texte_page = page.extract_text(
                     x_tolerance=2,
                     y_tolerance=3
                 )
 
-                if texte_page:
+                if texte_page and texte_page.strip():
+
                     morceaux.append(texte_page)
+
+                    continue
+
+                # ------------------------------------------------
+                # 2. AUCUN TEXTE → OCR TESSERACT
+                # ------------------------------------------------
+
+                texte_ocr = extraire_page_avec_ocr(page)
+
+                if texte_ocr:
+
+                    morceaux.append(texte_ocr)
 
     except Exception:
         return ""
@@ -71,12 +99,53 @@ def extraire_texte_pdf(file):
 
 
 # ============================================================
+# OCR D'UNE PAGE PDF
+# ============================================================
+
+def extraire_page_avec_ocr(page):
+    """
+    Transforme une page PDF en image puis utilise Tesseract
+    avec le français.
+
+    L'OCR est volontairement limité au cas où l'extraction
+    classique de la page ne fournit aucun texte.
+    """
+
+    try:
+
+        # Conversion de la page PDF en image haute résolution.
+        #
+        # 300 dpi est un bon compromis entre qualité OCR
+        # et temps de traitement.
+        image_page = page.to_image(
+            resolution=300
+        ).original
+
+        # OCR français.
+        #
+        # PSM 6 :
+        # suppose un bloc de texte relativement uniforme,
+        # ce qui convient généralement aux formulaires,
+        # CV et fiches de poste.
+        texte = pytesseract.image_to_string(
+            image_page,
+            lang="fra",
+            config="--psm 6"
+        )
+
+        return texte or ""
+
+    except Exception:
+        return ""
+
+
+# ============================================================
 # EXTRACTION WORD
 # ============================================================
 
 def extraire_texte_docx(file):
     """
-    Extrait le texte d'un document Word.
+    Extrait le texte d'un document Word .docx.
 
     Les paragraphes et les tableaux sont lus.
     """
@@ -87,9 +156,9 @@ def extraire_texte_docx(file):
 
         document = docx.Document(file)
 
-        # ----------------------------
+        # ------------------------------------------------
         # Paragraphes
-        # ----------------------------
+        # ------------------------------------------------
 
         for paragraphe in document.paragraphs:
 
@@ -98,9 +167,9 @@ def extraire_texte_docx(file):
             if texte:
                 morceaux.append(texte)
 
-        # ----------------------------
+        # ------------------------------------------------
         # Tableaux
-        # ----------------------------
+        # ------------------------------------------------
 
         for table in document.tables:
 
@@ -116,6 +185,7 @@ def extraire_texte_docx(file):
                         cellules.append(texte_cellule)
 
                 if cellules:
+
                     morceaux.append(
                         " | ".join(cellules)
                     )
@@ -132,19 +202,20 @@ def extraire_texte_docx(file):
 
 def nettoyer_texte(texte):
     """
-    Nettoyage léger.
+    Nettoyage léger du texte.
 
-    IMPORTANT :
-    On conserve les retours à la ligne car ils sont essentiels
-    pour reconnaître les différentes rubriques de la fiche.
+    Les retours à la ligne sont conservés car ils sont
+    indispensables pour l'analyse des rubriques.
     """
 
     if not texte:
         return ""
 
+    # Normalisation des retours à la ligne
     texte = texte.replace("\r\n", "\n")
     texte = texte.replace("\r", "\n")
 
+    # Espaces insécables
     texte = texte.replace("\xa0", " ")
 
     # Espaces multiples sur une même ligne
@@ -154,7 +225,7 @@ def nettoyer_texte(texte):
         texte
     )
 
-    # Lignes vides multiples
+    # Trop nombreuses lignes vides
     texte = re.sub(
         r"\n[ \t]*\n[ \t]*\n+",
         "\n\n",
@@ -169,22 +240,23 @@ def nettoyer_texte(texte):
 # ============================================================
 
 # IMPORTANT :
-# On ne cherche volontairement QUE ces trois informations.
+# On ne cherche QUE ces trois informations.
 #
-# Cela évite que l'application invente :
-# - une entreprise à partir d'une autre rubrique ;
-# - un métier à partir d'un titre quelconque ;
-# - des compétences génériques ;
-# - des tâches qui ne sont pas réellement dans la rubrique
-#   "Liste des tâches proposées".
+# 1. Nom de l'entreprise
+# 2. Intitulé du poste
+# 3. Liste des tâches proposées
+#
+# Aucune compétence générique n'est ajoutée.
+# Aucun métier n'est inventé.
+# Aucun autre champ de la fiche n'est utilisé.
 
 MOTIF_ENTREPRISE = re.compile(
-    r"^\s*nom\s+de\s+l['’]entreprise\s*:?\s*$",
+    r"^\s*nom\s+de\s+l['’]?entreprise\s*:?\s*$",
     re.IGNORECASE
 )
 
 MOTIF_POSTE = re.compile(
-    r"^\s*intitul[ée]\s+du\s+poste\s*:?\s*$",
+    r"^\s*intitul[ée]?\s+du\s+poste\s*:?\s*$",
     re.IGNORECASE
 )
 
@@ -195,15 +267,15 @@ MOTIF_TACHES = re.compile(
 
 
 # ============================================================
-# NORMALISATION D'UNE LIGNE POUR LA RECHERCHE
+# NORMALISATION D'UNE LIGNE
 # ============================================================
 
 def _normaliser_ligne(ligne):
     """
-    Normalise une ligne uniquement pour faciliter la détection
-    des libellés.
+    Normalise une ligne uniquement pour faciliter
+    la reconnaissance des libellés.
 
-    Le texte original est conservé pour les valeurs.
+    La valeur réellement extraite n'est pas modifiée.
     """
 
     if not ligne:
@@ -223,10 +295,11 @@ def _normaliser_ligne(ligne):
 
 
 # ============================================================
-# RECONNAISSANCE D'UN LIBELLÉ
+# RECONNAISSANCE DES LIBELLÉS
 # ============================================================
 
 def _est_libelle_entreprise(ligne):
+
     texte = _normaliser_ligne(ligne)
 
     return bool(
@@ -239,11 +312,12 @@ def _est_libelle_entreprise(ligne):
 
 
 def _est_libelle_poste(ligne):
+
     texte = _normaliser_ligne(ligne)
 
     return bool(
         re.match(
-            r"^intitul[ée]\s+du\s+poste\s*:?\s*$",
+            r"^intitul[ée]?\s+du\s+poste\s*:?\s*$",
             texte,
             re.IGNORECASE
         )
@@ -251,6 +325,7 @@ def _est_libelle_poste(ligne):
 
 
 def _est_libelle_taches(ligne):
+
     texte = _normaliser_ligne(ligne)
 
     return bool(
@@ -263,6 +338,7 @@ def _est_libelle_taches(ligne):
 
 
 def _est_un_libelle_cible(ligne):
+
     return (
         _est_libelle_entreprise(ligne)
         or _est_libelle_poste(ligne)
@@ -282,30 +358,31 @@ def _extraire_valeur_apres_libelle(
     """
     Récupère la valeur située après un libellé.
 
-    Cas pris en charge :
+    Exemple :
 
         Nom de l'entreprise
-        ABC INDUSTRIE
+        COLAS
 
     ou :
 
-        Nom de l'entreprise : ABC INDUSTRIE
+        Nom de l'entreprise : COLAS
 
     Pour les tâches :
 
         Liste des tâches proposées
-        tâche 1
-        tâche 2
-        tâche 3
+        Maçonnerie VRD
+        Pose de bordures
+        Pose de tuyaux
+        Réglage et nivellement divers matériaux
 
-    Les trois tâches sont conservées.
+    Toutes les lignes de tâches sont conservées.
     """
 
     ligne_libelle = lignes[index_libelle].strip()
 
-    # --------------------------------------------------------
-    # 1. Valeur éventuellement présente sur la même ligne
-    # --------------------------------------------------------
+    # ========================================================
+    # VALEUR SUR LA MÊME LIGNE
+    # ========================================================
 
     if type_information == "entreprise":
 
@@ -322,7 +399,7 @@ def _extraire_valeur_apres_libelle(
     elif type_information == "poste":
 
         valeur = re.sub(
-            r"^\s*intitul[ée]\s+du\s+poste\s*:?\s*",
+            r"^\s*intitul[ée]?\s+du\s+poste\s*:?\s*",
             "",
             ligne_libelle,
             flags=re.IGNORECASE
@@ -343,9 +420,9 @@ def _extraire_valeur_apres_libelle(
         if valeur:
             return valeur
 
-    # --------------------------------------------------------
-    # 2. Valeur(s) sur les lignes suivantes
-    # --------------------------------------------------------
+    # ========================================================
+    # VALEUR(S) SUR LES LIGNES SUIVANTES
+    # ========================================================
 
     valeurs = []
 
@@ -356,17 +433,22 @@ def _extraire_valeur_apres_libelle(
 
         ligne = lignes[i].strip()
 
+        # ----------------------------------------------------
+        # Ligne vide
+        # ----------------------------------------------------
+
         if not ligne:
-            # Une ligne vide arrête la rubrique uniquement
-            # si on a déjà trouvé quelque chose.
+
             if valeurs:
                 break
 
             continue
 
-        # Une autre rubrique cible arrête la capture.
-        if _est_un_libelle_cible(ligne):
+        # ----------------------------------------------------
+        # Nouvelle rubrique ciblée
+        # ----------------------------------------------------
 
+        if _est_un_libelle_cible(ligne):
             break
 
         # ----------------------------------------------------
@@ -377,7 +459,6 @@ def _extraire_valeur_apres_libelle(
 
             valeurs.append(ligne)
 
-            # Une seule valeur suffit.
             break
 
         # ----------------------------------------------------
@@ -388,7 +469,6 @@ def _extraire_valeur_apres_libelle(
 
             valeurs.append(ligne)
 
-            # Une seule valeur suffit.
             break
 
         # ----------------------------------------------------
@@ -399,21 +479,14 @@ def _extraire_valeur_apres_libelle(
 
             valeurs.append(ligne)
 
-    # --------------------------------------------------------
-    # Résultat
-    # --------------------------------------------------------
+    # ========================================================
+    # RÉSULTAT
+    # ========================================================
 
     if type_information == "taches":
 
-        # Chaque ligne de tâche est conservée.
-        #
-        # On sépare par des virgules car le matching attend
-        # actuellement une chaîne de type :
-        #
-        # tâche 1, tâche 2, tâche 3
-
         return ", ".join(
-            valeur
+            valeur.strip()
             for valeur in valeurs
             if valeur.strip()
         )
@@ -437,9 +510,8 @@ def extraire_fiche_poste_ciblee(texte):
     2. Intitulé du poste
     3. Liste des tâches proposées
 
-    Aucune compétence n'est inventée.
     Aucun métier n'est déduit.
-    Aucun intitulé voisin n'est utilisé comme valeur.
+    Aucune compétence n'est inventée.
 
     Retourne :
 
@@ -465,9 +537,9 @@ def extraire_fiche_poste_ciblee(texte):
     if not texte:
         return resultat
 
-    # --------------------------------------------------------
-    # Préparation des lignes
-    # --------------------------------------------------------
+    # ========================================================
+    # PRÉPARATION DES LIGNES
+    # ========================================================
 
     lignes = texte.split("\n")
 
@@ -477,9 +549,9 @@ def extraire_fiche_poste_ciblee(texte):
         if ligne.strip()
     ]
 
-    # --------------------------------------------------------
-    # Recherche des trois rubriques
-    # --------------------------------------------------------
+    # ========================================================
+    # RECHERCHE DES TROIS RUBRIQUES
+    # ========================================================
 
     index_entreprise = None
     index_poste = None
@@ -488,23 +560,29 @@ def extraire_fiche_poste_ciblee(texte):
     for index, ligne in enumerate(lignes):
 
         if index_entreprise is None:
+
             if _est_libelle_entreprise(ligne):
+
                 index_entreprise = index
                 continue
 
         if index_poste is None:
+
             if _est_libelle_poste(ligne):
+
                 index_poste = index
                 continue
 
         if index_taches is None:
+
             if _est_libelle_taches(ligne):
+
                 index_taches = index
                 continue
 
-    # --------------------------------------------------------
-    # Entreprise
-    # --------------------------------------------------------
+    # ========================================================
+    # ENTREPRISE
+    # ========================================================
 
     if index_entreprise is not None:
 
@@ -519,9 +597,9 @@ def extraire_fiche_poste_ciblee(texte):
             resultat["entreprise"] = entreprise
             resultat["entreprise_trouvee"] = True
 
-    # --------------------------------------------------------
-    # Poste
-    # --------------------------------------------------------
+    # ========================================================
+    # POSTE
+    # ========================================================
 
     if index_poste is not None:
 
@@ -536,9 +614,9 @@ def extraire_fiche_poste_ciblee(texte):
             resultat["poste"] = poste
             resultat["poste_trouve"] = True
 
-    # --------------------------------------------------------
-    # Tâches
-    # --------------------------------------------------------
+    # ========================================================
+    # TÂCHES
+    # ========================================================
 
     if index_taches is not None:
 
