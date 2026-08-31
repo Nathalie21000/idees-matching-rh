@@ -898,8 +898,6 @@ elif page == "🏢 Importer une fiche de poste":
             fiche_ciblee = extraire_fiche_poste_ciblee(
                 texte
             )
-            st.write("DEBUG TEXTE EXTRAIT :", texte)
-            st.write("DEBUG FICHE CIBLEE :", fiche_ciblee)
             
             entreprise_detectee = (
                 fiche_ciblee.get("entreprise") or ""
