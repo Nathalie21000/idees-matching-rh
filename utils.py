@@ -1,58 +1,80 @@
-```python
 import pdfplumber
 import docx
 import re
 import pytesseract
 
+from PIL import Image
+
 
 # ============================================================
 # EXTRACTION DE TEXTE
-# PDF + WORD + OCR PDF SCANNÉ
+# PDF + WORD
 # ============================================================
 
 def extract_text(file):
     """
-    Extrait le texte d'un fichier PDF ou Word (.docx).
+    Extrait le texte d'un fichier PDF ou Word.
 
-    PDF :
-    - utilise pdfplumber si le PDF contient du vrai texte ;
-    - utilise Tesseract OCR si le PDF est scanné.
+    Pour un PDF :
+    1. On tente d'abord une extraction classique avec pdfplumber.
+    2. Si le PDF ne contient pas suffisamment de texte,
+       on utilise automatiquement Tesseract OCR.
+    3. Le texte OCR est obtenu page par page.
 
-    DOCX :
-    - lit les paragraphes ;
-    - lit également les tableaux.
+    Pour un DOCX :
+    - lecture des paragraphes ;
+    - lecture des tableaux.
     """
 
     nom_fichier = getattr(file, "name", "") or ""
     nom_fichier_min = nom_fichier.lower()
 
     if nom_fichier_min.endswith(".docx"):
+
         texte = extraire_texte_docx(file)
 
     elif nom_fichier_min.endswith(".pdf"):
+
         texte = extraire_texte_pdf(file)
 
+        # ----------------------------------------------------
+        # Si l'extraction classique est vide ou trop faible,
+        # on considère que le PDF est probablement scanné.
+        # ----------------------------------------------------
+
+        if len(texte.strip()) < 50:
+
+            texte_ocr = extraire_texte_pdf_ocr(file)
+
+            if texte_ocr.strip():
+
+                texte = texte_ocr
+
     else:
+
         texte = ""
 
     return nettoyer_texte(texte)
 
 
 # ============================================================
-# EXTRACTION PDF
+# EXTRACTION PDF CLASSIQUE
 # ============================================================
 
 def extraire_texte_pdf(file):
     """
-    Extrait le texte d'un PDF.
-
-    Si pdfplumber ne trouve pas de texte sur une page,
-    Tesseract est utilisé.
+    Extraction classique d'un PDF avec pdfplumber.
     """
 
     morceaux = []
 
     try:
+
+        # Revenir au début du fichier si nécessaire
+        try:
+            file.seek(0)
+        except Exception:
+            pass
 
         with pdfplumber.open(file) as pdf:
 
@@ -63,141 +85,72 @@ def extraire_texte_pdf(file):
                     y_tolerance=3
                 )
 
-                if texte_page and texte_page.strip():
+                if texte_page:
 
-                    morceaux.append(texte_page)
-
-                else:
-
-                    texte_ocr = extraire_page_avec_ocr(page)
-
-                    if texte_ocr:
-                        morceaux.append(texte_ocr)
+                    morceaux.append(
+                        texte_page
+                    )
 
     except Exception:
+
         return ""
 
     return "\n".join(morceaux)
 
 
 # ============================================================
-# OCR CLASSIQUE
+# EXTRACTION PDF PAR OCR
 # ============================================================
 
-def extraire_page_avec_ocr(page):
+def extraire_texte_pdf_ocr(file):
     """
-    Convertit une page PDF en image puis utilise Tesseract.
+    Utilise Tesseract pour lire un PDF scanné.
+
+    La page PDF est convertie en image puis envoyée
+    à Tesseract.
+
+    La langue française est privilégiée.
     """
+
+    morceaux = []
 
     try:
 
-        image_page = page.to_image(
-            resolution=300
-        ).original
+        try:
+            file.seek(0)
+        except Exception:
+            pass
 
-        texte = pytesseract.image_to_string(
-            image_page,
-            lang="fra",
-            config="--psm 6"
-        )
+        with pdfplumber.open(file) as pdf:
 
-        return texte or ""
+            for page in pdf.pages:
+
+                try:
+
+                    image_page = page.to_image(
+                        resolution=300
+                    ).original
+
+                    texte_page = pytesseract.image_to_string(
+                        image_page,
+                        lang="fra+eng"
+                    )
+
+                    if texte_page:
+
+                        morceaux.append(
+                            texte_page
+                        )
+
+                except Exception:
+
+                    continue
 
     except Exception:
+
         return ""
 
-
-# ============================================================
-# OCR AVEC COORDONNÉES
-# ============================================================
-
-def extraire_donnees_ocr(page):
-    """
-    Effectue un OCR avec coordonnées.
-
-    Tesseract retourne pour chaque mot :
-    - son texte ;
-    - sa position X ;
-    - sa position Y ;
-    - sa largeur ;
-    - sa hauteur ;
-    - son niveau de confiance.
-
-    Cette information permet de reconstruire les colonnes
-    du formulaire au lieu de dépendre uniquement de l'ordre
-    du texte OCR.
-    """
-
-    try:
-
-        image_page = page.to_image(
-            resolution=300
-        ).original
-
-        donnees = pytesseract.image_to_data(
-            image_page,
-            lang="fra",
-            config="--psm 6",
-            output_type=pytesseract.Output.DICT
-        )
-
-        mots = []
-
-        nombre = len(
-            donnees.get("text", [])
-        )
-
-        for i in range(nombre):
-
-            texte = (
-                donnees["text"][i]
-                or ""
-            ).strip()
-
-            if not texte:
-                continue
-
-            try:
-                confiance = float(
-                    donnees["conf"][i]
-                )
-            except Exception:
-                confiance = 0
-
-            try:
-                x = int(
-                    donnees["left"][i]
-                )
-
-                y = int(
-                    donnees["top"][i]
-                )
-
-                largeur = int(
-                    donnees["width"][i]
-                )
-
-                hauteur = int(
-                    donnees["height"][i]
-                )
-
-            except Exception:
-                continue
-
-            mots.append({
-                "texte": texte,
-                "x": x,
-                "y": y,
-                "largeur": largeur,
-                "hauteur": hauteur,
-                "confiance": confiance
-            })
-
-        return mots
-
-    except Exception:
-
-        return []
+    return "\n".join(morceaux)
 
 
 # ============================================================
@@ -206,7 +159,7 @@ def extraire_donnees_ocr(page):
 
 def extraire_texte_docx(file):
     """
-    Extrait le texte d'un document Word .docx.
+    Extrait le texte d'un document Word.
 
     Les paragraphes et les tableaux sont lus.
     """
@@ -215,14 +168,30 @@ def extraire_texte_docx(file):
 
     try:
 
+        try:
+            file.seek(0)
+        except Exception:
+            pass
+
         document = docx.Document(file)
+
+        # ----------------------------------------------------
+        # Paragraphes
+        # ----------------------------------------------------
 
         for paragraphe in document.paragraphs:
 
             texte = paragraphe.text.strip()
 
             if texte:
-                morceaux.append(texte)
+
+                morceaux.append(
+                    texte
+                )
+
+        # ----------------------------------------------------
+        # Tableaux
+        # ----------------------------------------------------
 
         for table in document.tables:
 
@@ -237,6 +206,7 @@ def extraire_texte_docx(file):
                     )
 
                     if texte_cellule:
+
                         cellules.append(
                             texte_cellule
                         )
@@ -259,8 +229,14 @@ def extraire_texte_docx(file):
 # ============================================================
 
 def nettoyer_texte(texte):
+    """
+    Nettoyage léger du texte.
+
+    Les retours à la ligne sont conservés.
+    """
 
     if not texte:
+
         return ""
 
     texte = texte.replace(
@@ -278,12 +254,23 @@ def nettoyer_texte(texte):
         " "
     )
 
+    # Supprimer les balises SVG / liens accidentellement
+    # récupérés par l'affichage Streamlit.
+    texte = re.sub(
+        r"\[svg\]\([^)]+\)",
+        "",
+        texte,
+        flags=re.IGNORECASE
+    )
+
+    # Espaces multiples
     texte = re.sub(
         r"[ \t]+",
         " ",
         texte
     )
 
+    # Lignes vides multiples
     texte = re.sub(
         r"\n[ \t]*\n[ \t]*\n+",
         "\n\n",
@@ -294,25 +281,41 @@ def nettoyer_texte(texte):
 
 
 # ============================================================
-# NORMALISATION
+# NORMALISATION D'UNE LIGNE
 # ============================================================
 
 def _normaliser_ligne(ligne):
+    """
+    Normalise une ligne pour faciliter la détection OCR.
+
+    Exemple :
+
+        | Nom de l'entreprise : | | Liste des tâches proposées : |
+
+    devient une chaîne plus facile à analyser.
+    """
 
     if not ligne:
+
         return ""
 
-    ligne = ligne.strip().lower()
+    ligne = ligne.strip()
 
     ligne = ligne.replace(
         "’",
         "'"
     )
 
-    ligne = re.sub(
-        r"[|¦]+",
-        " ",
-        ligne
+    # Supprimer les barres verticales utilisées par l'OCR
+    ligne = ligne.replace(
+        "|",
+        " "
+    )
+
+    # Supprimer certains caractères décoratifs
+    ligne = ligne.replace(
+        "®",
+        " "
     )
 
     ligne = re.sub(
@@ -325,7 +328,112 @@ def _normaliser_ligne(ligne):
 
 
 # ============================================================
-# RECONNAISSANCE ENTREPRISE
+# DETECTION DES LIBELLES
+# ============================================================
+
+def _position_libelle_entreprise(texte):
+    """
+    Retourne la position du libellé entreprise.
+    """
+
+    motifs = [
+        r"nom\s+de\s+l['’]entreprise\s*:?",
+        r"nom\s+de\s+l['’]entreprise",
+    ]
+
+    for motif in motifs:
+
+        resultat = re.search(
+            motif,
+            texte,
+            flags=re.IGNORECASE
+        )
+
+        if resultat:
+
+            return resultat.start(), resultat.end()
+
+    return None
+
+
+def _position_libelle_poste(texte):
+    """
+    Retourne la position du libellé poste.
+
+    Tolère les erreurs OCR fréquentes :
+
+        Intitulé du poste
+        Intitule du poste
+        Intitul du poste
+        Intitulé du poste:
+        Intitule du poste:
+    """
+
+    motifs = [
+
+        r"intitul[ée]?\s+du\s+poste\s*:?",
+
+        r"intitul[ée]?\s+de\s+poste\s*:?",
+
+        r"intitul[ée]?\s+poste\s*:?",
+    ]
+
+    for motif in motifs:
+
+        resultat = re.search(
+            motif,
+            texte,
+            flags=re.IGNORECASE
+        )
+
+        if resultat:
+
+            return (
+                resultat.start(),
+                resultat.end()
+            )
+
+    return None
+
+
+def _position_libelle_taches(texte):
+    """
+    Retourne la position du libellé tâches.
+
+    Tolère les erreurs d'accent et d'OCR.
+    """
+
+    motifs = [
+
+        r"liste\s+des\s+t[âa]ches\s+propos[ée]es\s*:?",
+
+        r"liste\s+des\s+taches\s+proposees\s*:?",
+
+        r"liste\s+des\s+taches\s+proposées\s*:?",
+
+        r"liste\s+des\s+t[âa]ches\s+proposees\s*:?",
+    ]
+
+    for motif in motifs:
+
+        resultat = re.search(
+            motif,
+            texte,
+            flags=re.IGNORECASE
+        )
+
+        if resultat:
+
+            return (
+                resultat.start(),
+                resultat.end()
+            )
+
+    return None
+
+
+# ============================================================
+# TEST LIBELLE
 # ============================================================
 
 def _est_libelle_entreprise(ligne):
@@ -334,37 +442,13 @@ def _est_libelle_entreprise(ligne):
         ligne
     )
 
-    return bool(
-        re.search(
-            r"nom\s+de\s+l['’]?entreprise",
-            texte,
-            re.IGNORECASE
+    return (
+        _position_libelle_entreprise(
+            texte
         )
+        is not None
     )
 
-
-# ============================================================
-# RECONNAISSANCE TÂCHES
-# ============================================================
-
-def _est_libelle_taches(ligne):
-
-    texte = _normaliser_ligne(
-        ligne
-    )
-
-    return bool(
-        re.search(
-            r"liste\s+des\s+t[âa]ches\s+propos[ée]es",
-            texte,
-            re.IGNORECASE
-        )
-    )
-
-
-# ============================================================
-# RECONNAISSANCE POSTE
-# ============================================================
 
 def _est_libelle_poste(ligne):
 
@@ -372,600 +456,421 @@ def _est_libelle_poste(ligne):
         ligne
     )
 
-    # Reconnaissance normale
-    if re.search(
-        r"intitul[ée]?\s+du\s+poste",
-        texte,
-        re.IGNORECASE
-    ):
-        return True
-
-    # Variantes observées dans notre OCR
-    variantes = [
-        "linie du poste",
-        "linte du poste",
-        "linie poste",
-        "linte poste",
-        "intitul poste",
-        "intitule poste",
-        "intitul du poste",
-        "intitule du poste",
-    ]
-
-    for variante in variantes:
-
-        if variante in texte:
-            return True
-
-    # Détection souple
-    if (
-        "poste" in texte
-        and (
-            "linie" in texte
-            or "linte" in texte
-            or "intitul" in texte
-            or "intitule" in texte
+    return (
+        _position_libelle_poste(
+            texte
         )
-    ):
-        return True
+        is not None
+    )
 
-    return False
+
+def _est_libelle_taches(ligne):
+
+    texte = _normaliser_ligne(
+        ligne
+    )
+
+    return (
+        _position_libelle_taches(
+            texte
+        )
+        is not None
+    )
+
+
+def _est_un_libelle_cible(ligne):
+
+    return (
+        _est_libelle_entreprise(ligne)
+        or _est_libelle_poste(ligne)
+        or _est_libelle_taches(ligne)
+    )
 
 
 # ============================================================
-# NETTOYAGE MOT OCR
+# NETTOYAGE VALEUR
 # ============================================================
 
-def _nettoyer_mot(mot):
+def _nettoyer_valeur(valeur):
 
-    if not mot:
+    if not valeur:
+
         return ""
 
-    mot = str(mot).strip()
+    valeur = valeur.strip()
 
-    mot = mot.strip(
-        "|¦:;,. "
+    valeur = valeur.strip(
+        "|:;,-"
     )
 
-    return mot
+    valeur = re.sub(
+        r"\s+",
+        " ",
+        valeur
+    )
+
+    return valeur.strip()
 
 
 # ============================================================
-# REGROUPEMENT DES MOTS PAR LIGNE
+# EXTRACTION ENTREPRISE
 # ============================================================
 
-def _regrouper_mots_par_ligne(
-    mots,
-    tolerance_y=15
-):
+def _extraire_entreprise_depuis_texte(texte):
     """
-    Regroupe les mots ayant une position verticale proche.
+    Recherche :
 
-    Cela permet de reconstituer des lignes à partir des
-    coordonnées fournies par Tesseract.
+        Nom de l'entreprise : COLAS
+
+    ou :
+
+        Nom de l'entreprise :
+        COLAS
+
+    ou dans une ligne OCR mélangée :
+
+        Nom de l'entreprise : | | Liste des tâches proposées
+
+    Dans ce dernier cas, on NE prend pas le libellé suivant
+    comme nom d'entreprise.
     """
 
-    lignes = []
-
-    mots_tries = sorted(
-        mots,
-        key=lambda mot: (
-            mot["y"],
-            mot["x"]
-        )
+    position = _position_libelle_entreprise(
+        texte
     )
 
-    for mot in mots_tries:
+    if position is None:
 
-        ajoute = False
+        return ""
 
-        centre_y = (
-            mot["y"]
-            + mot["hauteur"] / 2
+    debut_valeur = position[1:]
+
+    reste = texte[debut_valeur:]
+
+    # Si un autre libellé cible apparaît immédiatement,
+    # il n'y a pas de valeur sur cette partie.
+    positions_suivantes = []
+
+    for fonction in (
+        _position_libelle_poste,
+        _position_libelle_taches,
+    ):
+
+        pos = fonction(reste)
+
+        if pos is not None:
+
+            positions_suivantes.append(
+                pos[0]
+            )
+
+    if positions_suivantes:
+
+        fin = min(
+            positions_suivantes
         )
 
-        for ligne in lignes:
+        candidat = reste[:fin]
 
-            if abs(
-                centre_y
-                - ligne["centre_y"]
-            ) <= tolerance_y:
+    else:
 
-                ligne["mots"].append(
-                    mot
-                )
+        # On ne prend que la première ligne
+        # lorsqu'il n'y a pas de libellé suivant.
+        candidat = reste.split(
+            "\n",
+            1
+        )[0]
 
-                centres = [
-                    m["y"]
-                    + m["hauteur"] / 2
-                    for m in ligne["mots"]
-                ]
+    candidat = _nettoyer_valeur(
+        candidat
+    )
 
-                ligne["centre_y"] = (
-                    sum(centres)
-                    / len(centres)
-                )
+    # Si la valeur est vide, chercher la ligne suivante.
+    if not candidat:
 
-                ajoute = True
-                break
+        lignes = texte.split(
+            "\n"
+        )
 
-        if not ajoute:
+        for i, ligne in enumerate(
+            lignes
+        ):
 
-            lignes.append({
-                "centre_y": centre_y,
-                "mots": [mot]
-            })
+            if _est_libelle_entreprise(
+                ligne
+            ):
+
+                for suivante in lignes[
+                    i + 1:
+                ]:
+
+                    suivante = _nettoyer_valeur(
+                        suivante
+                    )
+
+                    if not suivante:
+
+                        continue
+
+                    if _est_un_libelle_cible(
+                        suivante
+                    ):
+
+                        return ""
+
+                    return suivante
+
+    return candidat
+
+
+# ============================================================
+# EXTRACTION POSTE
+# ============================================================
+
+def _extraire_poste_depuis_texte(texte):
+    """
+    Recherche l'intitulé du poste.
+
+    Exemple OCR :
+
+        Intitulé du poste:
+        OUVRIER VRD CONDUCTEUR D ENGINS
+    """
+
+    position = _position_libelle_poste(
+        texte
+    )
+
+    if position is None:
+
+        return ""
+
+    reste = texte[
+        position[1]:
+    ]
 
     # --------------------------------------------------------
-    # Tri horizontal des mots
+    # Le poste peut être sur la même ligne.
     # --------------------------------------------------------
+
+    candidat = reste.split(
+        "\n",
+        1
+    )[0]
+
+    candidat = _nettoyer_valeur(
+        candidat
+    )
+
+    # --------------------------------------------------------
+    # Si rien n'est trouvé, chercher ligne suivante.
+    # --------------------------------------------------------
+
+    if not candidat:
+
+        lignes = texte.split(
+            "\n"
+        )
+
+        for i, ligne in enumerate(
+            lignes
+        ):
+
+            if _est_libelle_poste(
+                ligne
+            ):
+
+                for suivante in lignes[
+                    i + 1:
+                ]:
+
+                    suivante = _nettoyer_valeur(
+                        suivante
+                    )
+
+                    if not suivante:
+
+                        continue
+
+                    if _est_un_libelle_cible(
+                        suivante
+                    ):
+
+                        return ""
+
+                    return suivante
+
+    return candidat
+
+
+# ============================================================
+# EXTRACTION TACHES
+# ============================================================
+
+def _extraire_taches_depuis_texte(texte):
+    """
+    Extrait les tâches situées après :
+
+        Liste des tâches proposées :
+
+    jusqu'au prochain libellé cible.
+
+    Important :
+    on limite volontairement la zone de lecture afin
+    d'éviter que tout le reste du formulaire soit considéré
+    comme une tâche.
+    """
+
+    position = _position_libelle_taches(
+        texte
+    )
+
+    if position is None:
+
+        return ""
+
+    reste = texte[
+        position[1]:
+    ]
+
+    # --------------------------------------------------------
+    # Trouver le prochain libellé cible.
+    # --------------------------------------------------------
+
+    positions_suivantes = []
+
+    for fonction in (
+        _position_libelle_poste,
+        _position_libelle_entreprise,
+    ):
+
+        pos = fonction(reste)
+
+        if pos is not None:
+
+            positions_suivantes.append(
+                pos[0]
+            )
+
+    if positions_suivantes:
+
+        fin = min(
+            positions_suivantes
+        )
+
+        zone = reste[:fin]
+
+    else:
+
+        # Si le poste n'est pas détecté à cause de l'OCR,
+        # on ne lit pas tout le document.
+        #
+        # On limite la recherche aux premières lignes.
+        zone = "\n".join(
+            reste.split("\n")[:8]
+        )
+
+    # --------------------------------------------------------
+    # Nettoyage
+    # --------------------------------------------------------
+
+    lignes = zone.split(
+        "\n"
+    )
+
+    valeurs = []
 
     for ligne in lignes:
 
-        ligne["mots"] = sorted(
-            ligne["mots"],
-            key=lambda mot: mot["x"]
+        ligne = _normaliser_ligne(
+            ligne
         )
 
-        ligne["texte"] = " ".join(
-            _nettoyer_mot(
-                mot["texte"]
-            )
-            for mot in ligne["mots"]
-            if _nettoyer_mot(
-                mot["texte"]
-            )
+        ligne = _nettoyer_valeur(
+            ligne
         )
 
-        ligne["x_min"] = min(
-            mot["x"]
-            for mot in ligne["mots"]
-        )
+        if not ligne:
 
-        ligne["x_max"] = max(
-            mot["x"]
-            + mot["largeur"]
-            for mot in ligne["mots"]
-        )
+            continue
 
-    lignes.sort(
-        key=lambda ligne: ligne["centre_y"]
-    )
-
-    return lignes
-
-
-# ============================================================
-# RECONSTRUCTION DES COLONNES DU FORMULAIRE
-# ============================================================
-
-def _extraire_formulaire_par_coordonnees(
-    mots
-):
-    """
-    Reconstruit les trois informations principales
-    du formulaire à partir des coordonnées OCR.
-
-    Structure attendue :
-
-        COLONNE GAUCHE
-        Nom de l'entreprise
-        COLAS
-        Intitulé du poste
-        OUVRIER VRD CONDUCTEUR D ENGINS
-
-        COLONNE DROITE
-        Liste des tâches proposées
-        Maçonnerie VRD
-        Pose de bordures
-        Pose de tuyaux
-        Réglage et nivellement divers matériaux
-    """
-
-    resultat = {
-        "entreprise": "",
-        "poste": "",
-        "taches": "",
-        "entreprise_trouvee": False,
-        "poste_trouve": False,
-        "taches_trouvees": False,
-    }
-
-    if not mots:
-        return resultat
-
-    lignes = _regrouper_mots_par_ligne(
-        mots
-    )
-
-    if not lignes:
-        return resultat
-
-    # ========================================================
-    # RECHERCHE DES MOTS-CLÉS
-    # ========================================================
-
-    index_entreprise = None
-    index_taches = None
-    index_poste = None
-
-    for index, ligne in enumerate(lignes):
-
-        texte = _normaliser_ligne(
-            ligne["texte"]
-        )
-
-        if (
-            index_entreprise is None
-            and "nom de l'entreprise"
-            in texte
+        if _est_un_libelle_cible(
+            ligne
         ):
-            index_entreprise = index
 
-        if (
-            index_taches is None
-            and (
-                "liste des tâches proposées"
-                in texte
-                or (
-                    "liste des taches proposées"
-                    in texte
-                )
-            )
-        ):
-            index_taches = index
-
-        if (
-            index_poste is None
-            and _est_libelle_poste(
-                ligne["texte"]
-            )
-        ):
-            index_poste = index
-
-    # ========================================================
-    # DÉTERMINATION DU MILIEU DE LA PAGE
-    # ========================================================
-
-    x_global_min = min(
-        mot["x"]
-        for mot in mots
-    )
-
-    x_global_max = max(
-        mot["x"]
-        + mot["largeur"]
-        for mot in mots
-    )
-
-    milieu = (
-        x_global_min
-        + (
-            x_global_max
-            - x_global_min
-        ) / 2
-    )
-
-    # ========================================================
-    # ENTREPRISE
-    # ========================================================
-
-    if index_entreprise is not None:
-
-        ligne_entete = lignes[
-            index_entreprise
-        ]
-
-        # --------------------------------------------
-        # Cherche les mots situés dans la colonne
-        # gauche et immédiatement sous le libellé.
-        # --------------------------------------------
-
-        y_entete = (
-            ligne_entete["centre_y"]
-        )
-
-        candidats = []
-
-        for ligne in lignes:
-
-            if (
-                ligne["centre_y"]
-                <= y_entete
-            ):
-                continue
-
-            if (
-                ligne["centre_y"]
-                > y_entete + 180
-            ):
-                continue
-
-            # Colonne gauche
-            if ligne["x_min"] < milieu:
-
-                texte = ligne["texte"].strip()
-
-                if not texte:
-                    continue
-
-                if _est_libelle_poste(
-                    texte
-                ):
-                    continue
-
-                if _est_libelle_taches(
-                    texte
-                ):
-                    continue
-
-                if (
-                    "habilitations"
-                    in texte.lower()
-                ):
-                    continue
-
-                candidats.append(
-                    (
-                        ligne["centre_y"],
-                        texte
-                    )
-                )
-
-        if candidats:
-
-            candidats.sort(
-                key=lambda element:
-                element[0]
-            )
-
-            resultat["entreprise"] = (
-                candidats[0][1]
-            )
-
-            resultat[
-                "entreprise_trouvee"
-            ] = True
-
-    # ========================================================
-    # POSTE
-    # ========================================================
-
-    if index_poste is not None:
-
-        ligne_poste = lignes[
-            index_poste
-        ]
-
-        y_poste = (
-            ligne_poste["centre_y"]
-        )
-
-        candidats = []
-
-        for ligne in lignes:
-
-            if (
-                ligne["centre_y"]
-                <= y_poste
-            ):
-                continue
-
-            if (
-                ligne["centre_y"]
-                > y_poste + 180
-            ):
-                continue
-
-            # Le poste est dans la colonne gauche.
-            if ligne["x_min"] < milieu:
-
-                texte = ligne["texte"].strip()
-
-                if not texte:
-                    continue
-
-                if _est_libelle_taches(
-                    texte
-                ):
-                    continue
-
-                if _est_libelle_entreprise(
-                    texte
-                ):
-                    continue
-
-                if (
-                    "habilitations"
-                    in texte.lower()
-                    or "risques"
-                    in texte.lower()
-                ):
-                    continue
-
-                candidats.append(
-                    (
-                        ligne["centre_y"],
-                        texte
-                    )
-                )
-
-        if candidats:
-
-            candidats.sort(
-                key=lambda element:
-                element[0]
-            )
-
-            # ------------------------------------------------
-            # On recherche de préférence une ligne suffisamment
-            # longue pour être un véritable intitulé.
-            # ------------------------------------------------
-
-            for _, candidat in candidats:
-
-                if len(candidat) >= 10:
-
-                    resultat["poste"] = (
-                        candidat
-                    )
-
-                    resultat[
-                        "poste_trouve"
-                    ] = True
-
-                    break
-
-            if not resultat["poste_trouve"]:
-
-                resultat["poste"] = (
-                    candidats[0][1]
-                )
-
-                resultat[
-                    "poste_trouve"
-                ] = True
-
-    # ========================================================
-    # TÂCHES
-    # ========================================================
-
-    if index_taches is not None:
-
-        ligne_taches = lignes[
-            index_taches
-        ]
-
-        y_taches = (
-            ligne_taches["centre_y"]
-        )
-
-        taches = []
-
-        for ligne in lignes:
-
-            if (
-                ligne["centre_y"]
-                <= y_taches
-            ):
-                continue
-
-            # Zone raisonnable sous le titre.
-            if (
-                ligne["centre_y"]
-                > y_taches + 220
-            ):
-                continue
-
-            # Colonne droite.
-            if ligne["x_min"] >= milieu:
-
-                texte = ligne["texte"].strip()
-
-                if not texte:
-                    continue
-
-                texte_bas = texte.lower()
-
-                # On ignore les éléments manifestement
-                # étrangers aux tâches.
-                if (
-                    "intitulé du poste"
-                    in texte_bas
-                    or "intitule du poste"
-                    in texte_bas
-                    or "habilitations"
-                    in texte_bas
-                    or "risques"
-                    in texte_bas
-                    or "conditions particulières"
-                    in texte_bas
-                    or "vip" in texte_bas
-                    or "sir" in texte_bas
-                ):
-                    continue
-
-                # On élimine les lignes très courtes
-                # ou manifestement parasites.
-                if len(texte) < 4:
-                    continue
-
-                # On élimine certaines erreurs OCR connues.
-                if (
-                    texte_bas.startswith(
-                        "dre panne"
-                    )
-                    or texte_bas.startswith(
-                        "!"
-                    )
-                    or texte_bas.startswith(
-                        "="
-                    )
-                    or texte_bas.startswith(
-                        "sondtons"
-                    )
-                ):
-                    continue
-
-                taches.append(
-                    texte
-                )
+            break
 
         # ----------------------------------------------------
-        # Les tâches utiles du formulaire se trouvent au début
-        # de cette zone.
+        # Éviter les éléments manifestement parasites.
         # ----------------------------------------------------
 
-        taches_finales = []
+        if ligne in (
+            "=",
+            "!",
+            "-",
+            "_",
+        ):
 
-        for tache in taches:
+            continue
 
-            if tache in taches_finales:
-                continue
-
-            taches_finales.append(
-                tache
-            )
-
-        # Quatre premières tâches maximum.
-        taches_finales = (
-            taches_finales[:4]
+        valeurs.append(
+            ligne
         )
 
-        if taches_finales:
+    # --------------------------------------------------------
+    # Nettoyage des tâches OCR.
+    # --------------------------------------------------------
 
-            resultat["taches"] = (
-                ", ".join(
-                    taches_finales
-                )
+    taches_propres = []
+
+    for valeur in valeurs:
+
+        valeur = re.sub(
+            r"^[•●▪◦\-]+\s*",
+            "",
+            valeur
+        )
+
+        valeur = _nettoyer_valeur(
+            valeur
+        )
+
+        if valeur:
+
+            taches_propres.append(
+                valeur
             )
 
-            resultat[
-                "taches_trouvees"
-            ] = True
-
-    return resultat
+    return ", ".join(
+        taches_propres
+    )
 
 
 # ============================================================
-# EXTRACTION CIBLÉE
+# EXTRACTION CIBLEE
 # ============================================================
 
-def extraire_fiche_poste_ciblee(
-    texte
-):
+def extraire_fiche_poste_ciblee(texte):
     """
-    Extrait :
+    Extrait uniquement :
 
     - entreprise
     - poste
     - tâches
 
-    Pour le texte déjà extrait, cette fonction conserve
-    une méthode classique de secours.
+    La fonction est spécialement adaptée aux PDF scannés
+    lus par Tesseract.
 
-    L'OCR avec coordonnées est utilisé par la fonction
-    dédiée lorsqu'il est disponible.
+    Retour :
+
+    {
+        "entreprise": "...",
+        "poste": "...",
+        "taches": "...",
+        "entreprise_trouvee": True/False,
+        "poste_trouve": True/False,
+        "taches_trouvees": True/False,
+    }
     """
 
     resultat = {
@@ -978,316 +883,107 @@ def extraire_fiche_poste_ciblee(
     }
 
     if not texte:
+
         return resultat
 
-    lignes = [
-        ligne.strip()
-        for ligne in texte.split("\n")
-        if ligne.strip()
+    # --------------------------------------------------------
+    # Normalisation générale
+    # --------------------------------------------------------
+
+    texte_normalise = texte.replace(
+        "\r\n",
+        "\n"
+    )
+
+    texte_normalise = texte_normalise.replace(
+        "\r",
+        "\n"
+    )
+
+    # --------------------------------------------------------
+    # ENTREPRISE
+    # --------------------------------------------------------
+
+    entreprise = _extraire_entreprise_depuis_texte(
+        texte_normalise
+    )
+
+    if entreprise:
+
+        resultat["entreprise"] = entreprise
+        resultat["entreprise_trouvee"] = True
+
+    # --------------------------------------------------------
+    # POSTE
+    # --------------------------------------------------------
+
+    poste = _extraire_poste_depuis_texte(
+        texte_normalise
+    )
+
+    if poste:
+
+        resultat["poste"] = poste
+        resultat["poste_trouve"] = True
+
+    # --------------------------------------------------------
+    # TACHES
+    # --------------------------------------------------------
+
+    taches = _extraire_taches_depuis_texte(
+        texte_normalise
+    )
+
+    if taches:
+
+        resultat["taches"] = taches
+        resultat["taches_trouvees"] = True
+
+    # --------------------------------------------------------
+    # SECURITE :
+    # Ne jamais considérer un libellé comme une valeur.
+    # --------------------------------------------------------
+
+    valeurs_interdites = [
+        "nom de l'entreprise",
+        "liste des tâches proposées",
+        "liste des taches proposées",
+        "liste des taches proposees",
+        "intitulé du poste",
+        "intitule du poste",
+        "intitul du poste",
     ]
 
-    # ========================================================
-    # RECHERCHE CLASSIQUE ENTREPRISE
-    # ========================================================
+    for cle in (
+        "entreprise",
+        "poste",
+        "taches",
+    ):
 
-    for index, ligne in enumerate(lignes):
+        valeur = resultat[cle]
 
-        if _est_libelle_entreprise(
-            ligne
-        ):
+        valeur_min = (
+            valeur.lower()
+            .strip()
+        )
 
-            # Valeur éventuellement sur la même ligne.
-            valeur = re.sub(
-                r".*nom\s+de\s+l['’]?entreprise\s*:?",
-                "",
-                ligne,
-                flags=re.IGNORECASE
-            ).strip()
+        for interdit in valeurs_interdites:
 
-            valeur = _nettoyer_mot(
-                valeur
-            )
+            if valeur_min == interdit:
 
-            if valeur:
-
-                resultat["entreprise"] = (
-                    valeur
-                )
+                resultat[cle] = ""
 
                 resultat[
-                    "entreprise_trouvee"
-                ] = True
+                    f"{cle}_trouvee"
+                ] = False
 
-            else:
-
-                # Cherche la valeur suivante.
-                for suivant in range(
-                    index + 1,
-                    min(
-                        index + 4,
-                        len(lignes)
-                    )
-                ):
-
-                    candidat = (
-                        lignes[suivant]
-                        .strip()
-                    )
-
-                    if not candidat:
-                        continue
-
-                    morceaux = [
-                        _nettoyer_mot(m)
-                        for m in candidat.split("|")
-                        if m.strip()
-                    ]
-
-                    if morceaux:
-
-                        valeur = morceaux[0]
-
-                        if (
-                            valeur
-                            and not _est_libelle_poste(
-                                valeur
-                            )
-                            and not _est_libelle_taches(
-                                valeur
-                            )
-                        ):
-
-                            resultat[
-                                "entreprise"
-                            ] = valeur
-
-                            resultat[
-                                "entreprise_trouvee"
-                            ] = True
-
-                            break
-
-            break
-
-    # ========================================================
-    # RECHERCHE CLASSIQUE POSTE
-    # ========================================================
-
-    for index, ligne in enumerate(lignes):
-
-        if _est_libelle_poste(
-            ligne
-        ):
-
-            # ------------------------------------------------
-            # Valeur sur la même ligne
-            # ------------------------------------------------
-
-            motifs = [
-                r"intitul[ée]?\s+du\s+poste\s*:?",
-                r"linie\s+du\s+poste\s*:?",
-                r"linte\s+du\s+poste\s*:?",
-            ]
-
-            valeur = ""
-
-            for motif in motifs:
-
-                valeur = _extraire_apres_texte(
-                    ligne,
-                    motif
-                )
-
-                if valeur:
-                    break
-
-            if valeur:
-
-                resultat["poste"] = (
-                    valeur
-                )
-
-                resultat[
-                    "poste_trouve"
-                ] = True
-
-            else:
-
-                # ------------------------------------------------
-                # Recherche sur les lignes suivantes
-                # ------------------------------------------------
-
-                for suivant in range(
-                    index + 1,
-                    min(
-                        index + 5,
-                        len(lignes)
-                    )
-                ):
-
-                    candidat = (
-                        lignes[suivant]
-                        .strip()
-                    )
-
-                    if not candidat:
-                        continue
-
-                    if _est_libelle_taches(
-                        candidat
-                    ):
-                        continue
-
-                    if (
-                        "habilitations"
-                        in candidat.lower()
-                    ):
-                        break
-
-                    morceaux = [
-                        _nettoyer_mot(m)
-                        for m in candidat.split("|")
-                        if m.strip()
-                    ]
-
-                    if len(morceaux) == 1:
-
-                        if len(
-                            morceaux[0]
-                        ) >= 4:
-
-                            resultat[
-                                "poste"
-                            ] = morceaux[0]
-
-                            resultat[
-                                "poste_trouve"
-                            ] = True
-
-                            break
-
-            break
-
-    # ========================================================
-    # RECHERCHE CLASSIQUE TÂCHES
-    # ========================================================
-
-    for index, ligne in enumerate(lignes):
-
-        if _est_libelle_taches(
-            ligne
-        ):
-
-            taches = []
-
-            for suivant in range(
-                index + 1,
-                min(
-                    index + 8,
-                    len(lignes)
-                )
-            ):
-
-                candidat = (
-                    lignes[suivant]
-                    .strip()
-                )
-
-                if not candidat:
-                    continue
-
-                if _est_libelle_poste(
-                    candidat
-                ):
-                    break
-
-                morceaux = [
-                    _nettoyer_mot(m)
-                    for m in candidat.split("|")
-                    if m.strip()
-                ]
-
-                for morceau in morceaux:
-
-                    if len(morceau) >= 4:
-
-                        texte_bas = (
-                            morceau.lower()
-                        )
-
-                        if (
-                            "habilitation"
-                            in texte_bas
-                            or "risque"
-                            in texte_bas
-                            or "conditions particulières"
-                            in texte_bas
-                        ):
-                            continue
-
-                        taches.append(
-                            morceau
-                        )
-
-            # Suppression doublons.
-            taches = list(
-                dict.fromkeys(
-                    taches
-                )
-            )
-
-            if taches:
-
-                resultat["taches"] = (
-                    ", ".join(
-                        taches[:4]
-                    )
-                )
-
-                resultat[
-                    "taches_trouvees"
-                ] = True
-
-            break
+                break
 
     return resultat
 
 
 # ============================================================
-# PETITE FONCTION UTILITAIRE
-# ============================================================
-
-def _extraire_apres_texte(
-    ligne,
-    motif
-):
-
-    resultat = re.search(
-        motif,
-        ligne,
-        flags=re.IGNORECASE
-    )
-
-    if not resultat:
-        return ""
-
-    valeur = ligne[
-        resultat.end():
-    ]
-
-    valeur = valeur.strip()
-
-    valeur = valeur.lstrip(
-        ":|¦ "
-    )
-
-    return _nettoyer_mot(
-        valeur
-    )
-
-
-# ============================================================
-# GÉNÉRATION DE PRÉSENTATION CANDIDAT
+# GENERATION PRESENTATION CANDIDAT
 # ============================================================
 
 def generer_presentation(
@@ -1300,8 +996,8 @@ def generer_presentation(
     agence
 ):
     """
-    Génère une présentation d'un candidat destinée
-    à l'entreprise cliente.
+    Génère une présentation d'un candidat
+    destinée à l'entreprise cliente.
     """
 
     texte = f"""
@@ -1332,4 +1028,3 @@ Agence de {agence}
 """
 
     return texte.strip()
-```
