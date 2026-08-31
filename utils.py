@@ -543,7 +543,7 @@ def _extraire_entreprise_depuis_texte(texte):
 
         return ""
 
-    debut_valeur = position[1:]
+    debut_valeur = position[1]
 
     reste = texte[debut_valeur:]
 
