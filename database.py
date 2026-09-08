@@ -15,6 +15,14 @@ supabase: Client = create_client(
     SUPABASE_KEY,
 )
 
+# Force explicitement la clé secrète dans l'en-tête
+# Authorization utilisé par PostgREST.
+supabase.postgrest.auth(SUPABASE_KEY)
+
+import base64
+import json
+
+
 
 # ============================================================
 # INITIALISATION
