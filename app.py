@@ -22,6 +22,7 @@ from database import (
     modifier_statut_suivi,
     statistiques_par_semaine,
     statistiques_dz,
+    supprimer_cv,
     supprimer_poste,
 )
 
@@ -231,6 +232,10 @@ if page == "📊 Tableau de bord":
         f"Agence : {agence}"
     )
 
+    # --------------------------------------------------------
+    # INDICATEURS PRINCIPAUX
+    # --------------------------------------------------------
+
     col1, col2, col3, col4 = st.columns(4)
 
     col1.metric(
@@ -259,32 +264,391 @@ if page == "📊 Tableau de bord":
         ),
     )
 
-    st.markdown("---")
+    # --------------------------------------------------------
+    # RECUPERATION DES DONNEES DE L'AGENCE
+    # --------------------------------------------------------
 
-    col5, col6 = st.columns(2)
-
-    col5.metric(
-        "🟢 CV envoyés à des clients",
-        compter_clients(agence),
-    )
-
-    col6.metric(
-        "🟠 CV envoyés à des prospects",
-        compter_prospects(agence),
-    )
-
-    st.subheader(
-        "Répartition des candidatures par statut"
-    )
-
-    lignes = repartition_suivi(
+    cvs_dashboard = lister_cv(
         agence
     )
 
-    if lignes:
+    suivis_dashboard = lister_suivi(
+        agence
+    )
+
+    postes_dashboard = recuperer_postes(
+        agence
+    )
+
+    st.markdown("---")
+
+    # --------------------------------------------------------
+    # TAUX DE TRANSFORMATION CLIENTS / PROSPECTS
+    # --------------------------------------------------------
+
+    st.subheader(
+        "🎯 Taux de transformation"
+    )
+
+    candidatures_clients = [
+        ligne
+        for ligne in suivis_dashboard
+        if ligne.get("type_entreprise") == "🟢 Client"
+        and ligne.get("candidat")
+        and ligne.get("statut") != "Commande non pourvue"
+    ]
+
+    candidatures_prospects = [
+        ligne
+        for ligne in suivis_dashboard
+        if ligne.get("type_entreprise") == "🟠 Prospect"
+        and ligne.get("candidat")
+        and ligne.get("statut") != "Commande non pourvue"
+    ]
+
+    recrutes_clients = [
+        ligne
+        for ligne in candidatures_clients
+        if ligne.get("statut") == "Recruté"
+    ]
+
+    recrutes_prospects = [
+        ligne
+        for ligne in candidatures_prospects
+        if ligne.get("statut") == "Recruté"
+    ]
+
+    taux_clients = (
+        len(recrutes_clients) / len(candidatures_clients) * 100
+        if candidatures_clients
+        else 0
+    )
+
+    taux_prospects = (
+        len(recrutes_prospects) / len(candidatures_prospects) * 100
+        if candidatures_prospects
+        else 0
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.markdown(
+            "### 🎯 Taux de transformation **clients**"
+        )
+
+        c1, c2, c3 = st.columns(3)
+
+        c1.metric(
+            "Envoyés",
+            len(candidatures_clients),
+        )
+
+        c2.metric(
+            "Recrutés",
+            len(recrutes_clients),
+        )
+
+        c3.metric(
+            "Taux",
+            f"{taux_clients:.1f} %",
+        )
+
+    with col2:
+
+        st.markdown(
+            "### 🎯 Taux de transformation **prospects**"
+        )
+
+        c1, c2, c3 = st.columns(3)
+
+        c1.metric(
+            "Envoyés",
+            len(candidatures_prospects),
+        )
+
+        c2.metric(
+            "Recrutés",
+            len(recrutes_prospects),
+        )
+
+        c3.metric(
+            "Taux",
+            f"{taux_prospects:.1f} %",
+        )
+
+    st.caption(
+        "Le taux est calculé sur les candidatures envoyées "
+        "(hors commandes non pourvues)."
+    )
+
+    # --------------------------------------------------------
+    # REPARTITION DES PROFILS ENVOYES
+    # --------------------------------------------------------
+
+    st.markdown("---")
+
+    st.subheader(
+        "👤 Répartition des profils envoyés"
+    )
+
+    # On relie le candidat du suivi à son CV afin de retrouver
+    # le type de profil enregistré : Intérimaire ou Candidat.
+    profils_par_candidat = {}
+
+    for cv in cvs_dashboard:
+
+        nom_candidat = (
+            cv.get("candidat") or ""
+        ).strip().lower()
+
+        if nom_candidat and nom_candidat not in profils_par_candidat:
+
+            profils_par_candidat[nom_candidat] = (
+                cv.get("type_profil") or ""
+            )
+
+    statistiques_profils = []
+
+    for profil in [
+        "🟢 Intérimaire",
+        "🟡 Candidat",
+    ]:
+
+        lignes_profil = []
+
+        for ligne in suivis_dashboard:
+
+            candidat = (
+                ligne.get("candidat") or ""
+            ).strip().lower()
+
+            type_entreprise = (
+                ligne.get("type_entreprise") or ""
+            )
+
+            statut = ligne.get(
+                "statut"
+            )
+
+            type_profil = profils_par_candidat.get(
+                candidat,
+                "",
+            )
+
+            if (
+                candidat
+                and type_profil == profil
+                and type_entreprise in [
+                    "🟢 Client",
+                    "🟠 Prospect",
+                ]
+                and statut != "Commande non pourvue"
+            ):
+
+                lignes_profil.append(
+                    ligne
+                )
+
+        recrutes_profil = [
+            ligne
+            for ligne in lignes_profil
+            if ligne.get("statut") == "Recruté"
+        ]
+
+        taux_profil = (
+            len(recrutes_profil) / len(lignes_profil) * 100
+            if lignes_profil
+            else 0
+        )
+
+        statistiques_profils.append(
+            {
+                "Profil": profil,
+                "Nombre envoyé": len(lignes_profil),
+                "Recruté": len(recrutes_profil),
+                "Taux de transformation": (
+                    f"{taux_profil:.1f} %"
+                ),
+            }
+        )
+
+    st.dataframe(
+        statistiques_profils,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    # --------------------------------------------------------
+    # METIERS PRESENTS DANS LA CVTHEQUE
+    # --------------------------------------------------------
+
+    st.markdown("---")
+
+    st.subheader(
+        "👷 Métiers présents dans la CVthèque"
+    )
+
+    compte_metiers = {}
+
+    for cv in cvs_dashboard:
+
+        metier = (
+            cv.get("metier") or ""
+        ).strip()
+
+        if metier:
+
+            compte_metiers[metier] = (
+                compte_metiers.get(metier, 0) + 1
+            )
+
+    if compte_metiers:
+
+        compte_metiers = dict(
+            sorted(
+                compte_metiers.items(),
+                key=lambda element: element[1],
+                reverse=True,
+            )
+        )
 
         st.bar_chart(
-            lignes
+            compte_metiers
+        )
+
+    else:
+
+        st.info(
+            "Aucun métier renseigné dans la CVthèque."
+        )
+
+    # --------------------------------------------------------
+    # METIERS RECHERCHES / PRESSENTIS
+    # --------------------------------------------------------
+
+    st.subheader(
+        "🎯 Métiers recherchés / pressentis"
+    )
+
+    compte_metiers_recherches = {}
+
+    for cv in cvs_dashboard:
+
+        valeur = (
+            cv.get("metiers_recherches") or ""
+        )
+
+        for metier_recherche in valeur.split(","):
+
+            metier_recherche = metier_recherche.strip()
+
+            if metier_recherche:
+
+                compte_metiers_recherches[
+                    metier_recherche
+                ] = (
+                    compte_metiers_recherches.get(
+                        metier_recherche,
+                        0,
+                    ) + 1
+                )
+
+    if compte_metiers_recherches:
+
+        compte_metiers_recherches = dict(
+            sorted(
+                compte_metiers_recherches.items(),
+                key=lambda element: element[1],
+                reverse=True,
+            )
+        )
+
+        st.bar_chart(
+            compte_metiers_recherches
+        )
+
+    else:
+
+        st.info(
+            "Aucun métier recherché / pressenti renseigné."
+        )
+
+    # --------------------------------------------------------
+    # POSTES LES PLUS DEMANDES
+    # --------------------------------------------------------
+
+    st.subheader(
+        "🏢 Postes les plus demandés"
+    )
+
+    compte_postes_demandes = {}
+
+    for poste in postes_dashboard:
+
+        intitule = (
+            poste.get("poste") or ""
+        ).strip()
+
+        if intitule:
+
+            compte_postes_demandes[intitule] = (
+                compte_postes_demandes.get(
+                    intitule,
+                    0,
+                ) + 1
+            )
+
+    if compte_postes_demandes:
+
+        compte_postes_demandes = dict(
+            sorted(
+                compte_postes_demandes.items(),
+                key=lambda element: element[1],
+                reverse=True,
+            )
+        )
+
+        st.bar_chart(
+            compte_postes_demandes
+        )
+
+    else:
+
+        st.info(
+            "Aucun poste enregistré pour cette agence."
+        )
+
+    # --------------------------------------------------------
+    # REPARTITION DES CANDIDATURES PAR STATUT
+    # --------------------------------------------------------
+
+    st.subheader(
+        "📋 Répartition des candidatures par statut"
+    )
+
+    compte_statuts = {}
+
+    for ligne in suivis_dashboard:
+
+        statut = (
+            ligne.get("statut") or ""
+        )
+
+        if statut:
+
+            compte_statuts[statut] = (
+                compte_statuts.get(
+                    statut,
+                    0,
+                ) + 1
+            )
+
+    if compte_statuts:
+
+        st.bar_chart(
+            compte_statuts
         )
 
     else:
@@ -292,7 +656,6 @@ if page == "📊 Tableau de bord":
         st.info(
             "Aucune candidature suivie pour le moment."
         )
-
 
 # ============================================================
 # TABLEAU DE BORD DZ
@@ -432,6 +795,57 @@ elif page == "🌐 Tableau de bord DZ":
 
         for nom_agence, stats in stats_dz.items():
 
+            # Même définition que dans le tableau de bord agence :
+            # recrutement(s) / candidature(s) envoyée(s)
+            # pour chaque type d'entreprise.
+            suivis_agence_dz = lister_suivi(
+                nom_agence
+            )
+
+            candidatures_clients = [
+                ligne
+                for ligne in suivis_agence_dz
+                if ligne.get("type_entreprise") == "🟢 Client"
+                and ligne.get("candidat")
+                and ligne.get("statut") != "Commande non pourvue"
+            ]
+
+            candidatures_prospects = [
+                ligne
+                for ligne in suivis_agence_dz
+                if ligne.get("type_entreprise") == "🟠 Prospect"
+                and ligne.get("candidat")
+                and ligne.get("statut") != "Commande non pourvue"
+            ]
+
+            recrutes_clients = [
+                ligne
+                for ligne in candidatures_clients
+                if ligne.get("statut") == "Recruté"
+            ]
+
+            recrutes_prospects = [
+                ligne
+                for ligne in candidatures_prospects
+                if ligne.get("statut") == "Recruté"
+            ]
+
+            taux_clients = (
+                len(recrutes_clients)
+                / len(candidatures_clients)
+                * 100
+                if candidatures_clients
+                else 0
+            )
+
+            taux_prospects = (
+                len(recrutes_prospects)
+                / len(candidatures_prospects)
+                * 100
+                if candidatures_prospects
+                else 0
+            )
+
             tableau_agences.append(
                 {
                     "Agence": nom_agence,
@@ -441,7 +855,9 @@ elif page == "🌐 Tableau de bord DZ":
                     "Entretiens": stats["entretiens"],
                     "Recrutements": stats["recrutements"],
                     "Clients": stats["clients"],
+                    "Taux transformation client": f"{taux_clients:.1f} %",
                     "Prospects": stats["prospects"],
+                    "Taux transformation prospect": f"{taux_prospects:.1f} %",
                 }
             )
 
@@ -630,6 +1046,25 @@ elif page == "📄 Importer un CV":
                     value=metier_detecte,
                 )
 
+                metiers_recherches = st.text_input(
+                    "Métiers recherchés / métiers pressentis",
+                    value="",
+                    help=(
+                        "Indiquez un ou plusieurs métiers que le candidat "
+                        "souhaite exercer, séparés par des virgules."
+                    ),
+                )
+
+                date_fin_mission = st.date_input(
+                    "📅 Fin de mission",
+                    value=None,
+                )
+
+                date_disponibilite = st.date_input(
+                    "📅 Date de disponibilité",
+                    value=None,
+                )
+
                 competences = st.text_area(
                     "Compétences détectées",
                     value=competences_detectees,
@@ -682,6 +1117,9 @@ elif page == "📄 Importer un CV":
                         type_profil,
                         texte,
                         taches,
+                        metiers_recherches,
+                        date_fin_mission.isoformat() if date_fin_mission else None,
+                        date_disponibilite.isoformat() if date_disponibilite else None,
                     )
 
                     st.success(
@@ -767,6 +1205,9 @@ elif page == "📂 CVthèque":
             type_profil = cv.get("type_profil") or ""
             date_creation = cv.get("date_creation") or ""
             texte = cv.get("texte") or ""
+            metiers_recherches = cv.get("metiers_recherches") or ""
+            date_fin_mission = cv.get("date_fin_mission") or ""
+            date_disponibilite = cv.get("date_disponibilite") or ""
 
             texte_recherche = (
                 f"{candidat} "
@@ -811,6 +1252,21 @@ elif page == "📂 CVthèque":
 
                 st.write(
                     f"**Métier :** {metier}"
+                )
+
+                st.write(
+                    f"**Métiers recherchés / pressentis :** "
+                    f"{metiers_recherches if metiers_recherches else 'Non renseigné'}"
+                )
+
+                st.write(
+                    f"**Fin de mission :** "
+                    f"{date_fin_mission if date_fin_mission else 'Non renseignée'}"
+                )
+
+                st.write(
+                    f"**Disponibilité :** "
+                    f"{date_disponibilite if date_disponibilite else 'Non renseignée'}"
                 )
 
                 st.write(
@@ -859,6 +1315,33 @@ elif page == "📂 CVthèque":
                         st.text(
                             texte
                         )
+
+                st.markdown("---")
+
+                if st.button(
+                    "🗑️ Supprimer ce CV",
+                    key=f"suppr_cv_{cv_id}",
+                ):
+
+                    try:
+
+                        supprimer_cv(
+                            cv_id
+                        )
+
+                        st.success(
+                            "CV supprimé."
+                        )
+
+                        st.rerun()
+
+                    except Exception as erreur:
+
+                        st.error(
+                            "Erreur lors de la suppression du CV."
+                        )
+
+                        st.exception(erreur)
 
 
 # ============================================================

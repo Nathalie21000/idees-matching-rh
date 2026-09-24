@@ -51,6 +51,9 @@ def enregistrer_cv(
     type_profil,
     texte,
     taches="",
+    metiers_recherches="",
+    date_fin_mission=None,
+    date_disponibilite=None,
 ):
     donnees = {
         "agence": agence,
@@ -63,6 +66,9 @@ def enregistrer_cv(
         "type_profil": type_profil,
         "texte": texte,
         "taches": taches,
+        "metiers_recherches": metiers_recherches,
+        "date_fin_mission": date_fin_mission,
+        "date_disponibilite": date_disponibilite,
     }
 
     resultat = (
@@ -283,7 +289,7 @@ def lister_cv(agence):
         supabase
         .table("cv")
         .select(
-            "id, candidat, metier, competences, taches, "
+            "id, candidat, metier, metiers_recherches, date_fin_mission, date_disponibilite, competences, taches, "
             "caces, permis, type_profil, date_creation, texte"
         )
         .eq("agence", agence)
@@ -303,7 +309,7 @@ def recuperer_cvs_matching(agence):
         supabase
         .table("cv")
         .select(
-            "id, candidat, texte, metier, competences, taches, "
+            "id, candidat, texte, metier, metiers_recherches, date_fin_mission, date_disponibilite, competences, taches, "
             "caces, permis, type_profil"
         )
         .eq("agence", agence)
@@ -424,7 +430,7 @@ def recuperer_cv(id_cv):
         supabase
         .table("cv")
         .select(
-            "id, candidat, metier, competences, taches, "
+            "id, candidat, metier, metiers_recherches, date_fin_mission, date_disponibilite, competences, taches, "
             "caces, permis, type_profil, texte"
         )
         .eq("id", id_cv)
