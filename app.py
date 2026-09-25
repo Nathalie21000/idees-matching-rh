@@ -54,6 +54,250 @@ st.set_page_config(
 )
 
 
+# ============================================================
+# IDENTITE VISUELLE ID'EES
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+    :root {
+        --idees-green: #00A878;
+        --idees-green-dark: #008F68;
+        --idees-green-light: #E9F7F2;
+        --idees-anthracite: #2F3437;
+        --idees-grey: #F4F7F6;
+        --idees-border: #DCE5E1;
+        --idees-white: #FFFFFF;
+    }
+
+    /* ===== FOND GENERAL ===== */
+    .stApp {
+        background: #FFFFFF;
+    }
+
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+        max-width: 1500px;
+    }
+
+    /* ===== TYPOGRAPHIE ===== */
+    h1, h2, h3, h4 {
+        color: var(--idees-anthracite) !important;
+        letter-spacing: -0.02em;
+    }
+
+    h1 {
+        font-weight: 750 !important;
+    }
+
+    h2, h3 {
+        font-weight: 700 !important;
+    }
+
+    p, label, [data-testid="stCaptionContainer"] {
+        color: #667078;
+    }
+
+    /* ===== SIDEBAR ID'EES INTERIM ===== */
+    [data-testid="stSidebar"] {
+        background: #263238;
+        border-right: none;
+    }
+
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 1.1rem;
+    }
+
+    /* ===== LOGO ID'EES INTERIM ===== */
+    [data-testid="stSidebar"] [data-testid="stImage"] {
+        background: #FFFFFF;
+        border-radius: 12px;
+        padding: 10px 14px;
+        margin: 0 auto 1rem auto;
+        box-sizing: border-box;
+    }
+
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+        color: #FFFFFF !important;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+        color: #FFFFFF;
+    }
+
+    [data-testid="stSidebar"] .stSelectbox > label,
+    [data-testid="stSidebar"] .stRadio > label {
+        color: #DCE5E1 !important;
+        font-weight: 600;
+    }
+
+    [data-testid="stSidebar"] [data-baseweb="select"] > div {
+        background: #FFFFFF;
+        border: 1px solid #DCE5E1;
+        border-radius: 8px;
+    }
+
+    /* Navigation radio : apparence plus proche d'un menu */
+    [data-testid="stSidebar"] [role="radiogroup"] {
+        gap: 0.25rem;
+    }
+
+    [data-testid="stSidebar"] [role="radio"] {
+        border-radius: 8px;
+        padding: 0.42rem 0.55rem;
+        transition: background 0.15s ease;
+    }
+
+    [data-testid="stSidebar"] [role="radio"]:hover {
+        background: rgba(0, 168, 120, 0.16);
+    }
+
+    [data-testid="stSidebar"] [role="radio"][aria-checked="true"] {
+        background: var(--idees-green);
+    }
+
+    [data-testid="stSidebar"] [role="radio"][aria-checked="true"] p,
+    [data-testid="stSidebar"] [role="radio"][aria-checked="true"] span {
+        color: #FFFFFF !important;
+        font-weight: 700;
+    }
+
+    [data-testid="stSidebar"] hr {
+        border-color: rgba(255,255,255,0.16);
+    }
+
+    /* ===== CARTES METRIQUES ===== */
+    [data-testid="stMetric"] {
+        background: #FFFFFF;
+        border: 1px solid var(--idees-border);
+        border-left: 4px solid var(--idees-green);
+        border-radius: 12px;
+        padding: 1rem 1.1rem;
+        box-shadow: 0 2px 10px rgba(39, 55, 61, 0.05);
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: #657078 !important;
+        font-weight: 600;
+    }
+
+    [data-testid="stMetricValue"] {
+        color: var(--idees-anthracite) !important;
+        font-weight: 750;
+    }
+
+    /* ===== BOUTONS ===== */
+    .stButton > button {
+        background: var(--idees-green);
+        color: #FFFFFF;
+        border: 1px solid var(--idees-green);
+        border-radius: 8px;
+        font-weight: 650;
+        min-height: 2.55rem;
+        box-shadow: none;
+    }
+
+    .stButton > button:hover {
+        background: var(--idees-green-dark);
+        border-color: var(--idees-green-dark);
+        color: #FFFFFF;
+    }
+
+    .stButton > button:focus {
+        box-shadow: 0 0 0 2px rgba(0,168,120,0.22);
+    }
+
+    /* ===== INPUTS / SELECTS ===== */
+    [data-baseweb="input"] > div,
+    [data-baseweb="textarea"] > div,
+    [data-baseweb="select"] > div {
+        border-color: var(--idees-border);
+        border-radius: 8px;
+    }
+
+    [data-baseweb="input"] > div:focus-within,
+    [data-baseweb="textarea"] > div:focus-within,
+    [data-baseweb="select"] > div:focus-within {
+        border-color: var(--idees-green);
+        box-shadow: 0 0 0 1px var(--idees-green);
+    }
+
+    /* ===== EXPANDERS / BLOCS ===== */
+    [data-testid="stExpander"] {
+        border: 1px solid var(--idees-border);
+        border-radius: 10px;
+        background: #FFFFFF;
+    }
+
+    [data-testid="stExpander"] summary:hover {
+        color: var(--idees-green);
+    }
+
+    /* ===== PROGRESS ===== */
+    [data-testid="stProgressBar"] > div > div {
+        background: var(--idees-green);
+    }
+
+    /* ===== SEPARATEURS ===== */
+    hr {
+        border-color: var(--idees-border);
+    }
+
+    /* ===== BANDEAUX / ZONES NATIVES STREAMLIT ===== */
+    [data-testid="stAlert"] {
+        border-radius: 10px;
+        background: var(--idees-green-light);
+        border-left: 4px solid var(--idees-green);
+    }
+
+    /* Barres et en-têtes des zones de recherche / sélection */
+    [data-testid="stTextInput"] input,
+    [data-testid="stTextArea"] textarea,
+    [data-testid="stDateInput"] input {
+        background: #FFFFFF;
+    }
+
+    [data-testid="stTextInput"] input:focus,
+    [data-testid="stTextArea"] textarea:focus,
+    [data-testid="stDateInput"] input:focus {
+        border-color: var(--idees-green) !important;
+        box-shadow: 0 0 0 1px var(--idees-green) !important;
+    }
+
+    /* En-têtes de tableaux */
+    [data-testid="stDataFrame"] th {
+        background: var(--idees-green-light) !important;
+        color: var(--idees-anthracite) !important;
+    }
+
+    /* Onglets / bandeaux de navigation Streamlit */
+    [data-baseweb="tab-list"] {
+        background: var(--idees-green-light);
+        border-radius: 8px;
+        padding: 3px;
+    }
+
+    [data-baseweb="tab"][aria-selected="true"] {
+        color: var(--idees-green-dark) !important;
+    }
+
+    /* ===== LIENS ===== */
+    a {
+        color: var(--idees-green-dark);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 AGENCES = [
     "Alençon",
     "Avranches",
@@ -187,7 +431,7 @@ st.sidebar.image(
     width=180,
 )
 
-st.sidebar.title("🧑‍💼 ID'EES INTERIM")
+st.sidebar.title("ID'EES INTERIM")
 
 agence = st.sidebar.selectbox(
     "Agence",
@@ -515,7 +759,8 @@ if page == "📊 Tableau de bord":
         )
 
         st.bar_chart(
-            compte_metiers
+            compte_metiers,
+            color="#00A878",
         )
 
     else:
@@ -566,7 +811,8 @@ if page == "📊 Tableau de bord":
         )
 
         st.bar_chart(
-            compte_metiers_recherches
+            compte_metiers_recherches,
+            color="#00A878",
         )
 
     else:
@@ -611,7 +857,8 @@ if page == "📊 Tableau de bord":
         )
 
         st.bar_chart(
-            compte_postes_demandes
+            compte_postes_demandes,
+            color="#00A878",
         )
 
     else:
@@ -648,7 +895,8 @@ if page == "📊 Tableau de bord":
     if compte_statuts:
 
         st.bar_chart(
-            compte_statuts
+            compte_statuts,
+            color="#00A878",
         )
 
     else:
@@ -943,7 +1191,8 @@ elif page == "🌐 Tableau de bord DZ":
         }
 
         st.bar_chart(
-            graphique_candidatures
+            graphique_candidatures,
+            color="#00A878",
         )
 
         st.write(
@@ -956,7 +1205,8 @@ elif page == "🌐 Tableau de bord DZ":
         }
 
         st.bar_chart(
-            graphique_recrutements
+            graphique_recrutements,
+            color="#00A878",
         )
 
         st.write(
@@ -969,7 +1219,8 @@ elif page == "🌐 Tableau de bord DZ":
         }
 
         st.bar_chart(
-            graphique_cv
+            graphique_cv,
+            color="#00A878",
         )
 
 
