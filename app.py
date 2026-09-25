@@ -314,6 +314,7 @@ STATUTS_SUIVI = [
     "Entretien programmé",
     "Recruté",
     "Refusé",
+    "Commande non pourvue",
 ]
 
 
