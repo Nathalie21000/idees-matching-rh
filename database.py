@@ -141,6 +141,7 @@ def enregistrer_suivi(
     poste,
     statut,
     type_entreprise=None,
+    type_profil=None,
 ):
     donnees = {
         "agence": agence,
@@ -149,6 +150,7 @@ def enregistrer_suivi(
         "poste": poste,
         "statut": statut,
         "type_entreprise": type_entreprise,
+        "type_profil": type_profil,
     }
 
     resultat = (
@@ -371,6 +373,7 @@ def ajouter_suivi(
     poste,
     statut,
     type_entreprise,
+    type_profil=None,
 ):
     return enregistrer_suivi(
         agence,
@@ -379,6 +382,7 @@ def ajouter_suivi(
         poste,
         statut,
         type_entreprise,
+        type_profil,
     )
 
 
@@ -392,7 +396,7 @@ def lister_suivi(agence):
         .table("suivi")
         .select(
             "id, candidat, entreprise, poste, statut, "
-            "type_entreprise, date_creation"
+            "type_entreprise, type_profil, date_creation"
         )
         .eq("agence", agence)
         .order("date_creation", desc=True)

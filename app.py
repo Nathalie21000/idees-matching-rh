@@ -2181,6 +2181,16 @@ elif page == "🔍 Matching":
 
                         try:
 
+                            cv_complet = recuperer_cv(
+                                r["cv_id"]
+                            )
+
+                            type_profil = (
+                                cv_complet.get("type_profil")
+                                if cv_complet
+                                else ""
+                            )
+
                             enregistrer_suivi(
                                 agence,
                                 r["candidat"],
@@ -2188,6 +2198,7 @@ elif page == "🔍 Matching":
                                 poste_nom,
                                 statut,
                                 type_entreprise,
+                                type_profil,
                             )
 
                             st.success(
