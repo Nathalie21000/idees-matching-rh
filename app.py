@@ -1266,7 +1266,7 @@ elif page == "🎯 Matching":
 
         for cv in cvs:
 
-            score = calculer_score(
+            resultat_matching = calculer_score(
                 cv,
                 poste,
             )
@@ -1286,7 +1286,15 @@ elif page == "🎯 Matching":
                         "type_profil",
                         "",
                     ),
-                    "score": score,
+                    "score": resultat_matching["score"],
+                    "explication": resultat_matching.get(
+                        "explication",
+                        [],
+                    ),
+                    "metier_poste": resultat_matching.get(
+                        "metier_poste",
+                        "",
+                    ),
                 }
             )
 
@@ -1327,6 +1335,11 @@ elif page == "🎯 Matching":
                         "Score",
                         f"{r['score']} %",
                     )
+
+                    if r.get("explication"):
+                        with st.expander("Voir le détail du matching"):
+                            for ligne in r["explication"]:
+                                st.write(ligne)
 
                 with col3:
 
