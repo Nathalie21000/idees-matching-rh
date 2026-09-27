@@ -20,7 +20,7 @@ from database import (
     recuperer_cv,
     lister_suivi,
     modifier_statut_suivi,
-    statistiques_par_semaine,
+    statistiques_hebdomadaires,
     statistiques_dz,
     supprimer_cv,
     supprimer_poste,
@@ -55,12 +55,13 @@ st.set_page_config(
 
 
 # ============================================================
-# IDENTITE VISUELLE ID'EES
+# STYLE
 # ============================================================
 
 st.markdown(
     """
     <style>
+
     :root {
         --idees-green: #00A878;
         --idees-green-dark: #008F68;
@@ -71,232 +72,101 @@ st.markdown(
         --idees-white: #FFFFFF;
     }
 
-    /* ===== FOND GENERAL ===== */
     .stApp {
-        background: #FFFFFF;
+        background-color: var(--idees-grey);
     }
 
-    .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-        max-width: 1500px;
+    section[data-testid="stSidebar"] {
+        background-color: var(--idees-anthracite);
     }
 
-    /* ===== TYPOGRAPHIE ===== */
-    h1, h2, h3, h4 {
-        color: var(--idees-anthracite) !important;
-        letter-spacing: -0.02em;
+    section[data-testid="stSidebar"] * {
+        color: white;
     }
 
-    h1 {
-        font-weight: 750 !important;
+    /* --------------------------------------------------------
+       LOGO DANS LA SIDEBAR
+       -------------------------------------------------------- */
+
+    section[data-testid="stSidebar"] div[data-testid="stImage"] {
+        background-color: white;
+        border-radius: 10px;
+        padding: 12px;
+        margin: 10px auto 18px auto;
     }
 
-    h2, h3 {
-        font-weight: 700 !important;
+    section[data-testid="stSidebar"] div[data-testid="stImage"] img {
+        border-radius: 4px;
     }
 
-    p, label, [data-testid="stCaptionContainer"] {
-        color: #667078;
+    .idees-title {
+        color: var(--idees-green);
+        font-size: 2.2rem;
+        font-weight: 800;
+        margin-bottom: 0.2rem;
     }
 
-    /* ===== SIDEBAR ID'EES INTERIM ===== */
-    [data-testid="stSidebar"] {
-        background: #263238;
-        border-right: none;
+    .idees-subtitle {
+        color: var(--idees-anthracite);
+        font-size: 1rem;
+        margin-bottom: 1.5rem;
     }
 
-    [data-testid="stSidebar"] > div:first-child {
-        padding-top: 1.1rem;
-    }
-
-    /* ===== LOGO ID'EES INTERIM ===== */
-    [data-testid="stSidebar"] [data-testid="stImage"] {
-        background: #FFFFFF;
+    .metric-card {
+        background-color: var(--idees-white);
+        border: 1px solid var(--idees-border);
+        border-left: 5px solid var(--idees-green);
         border-radius: 12px;
-        padding: 10px 14px;
-        margin: 0 auto 1rem auto;
-        box-sizing: border-box;
+        padding: 18px;
+        margin-bottom: 10px;
     }
 
-    [data-testid="stSidebar"] h1,
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3,
-    [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] p,
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-        color: #FFFFFF !important;
-    }
-
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: #FFFFFF;
-    }
-
-    [data-testid="stSidebar"] .stSelectbox > label,
-    [data-testid="stSidebar"] .stRadio > label {
-        color: #DCE5E1 !important;
+    .metric-title {
+        color: #6B7376;
+        font-size: 0.9rem;
         font-weight: 600;
     }
 
-    [data-testid="stSidebar"] [data-baseweb="select"] > div {
-        background: #FFFFFF;
-        border: 1px solid #DCE5E1;
+    .metric-value {
+        color: var(--idees-anthracite);
+        font-size: 2rem;
+        font-weight: 800;
+    }
+
+    .section-card {
+        background-color: var(--idees-white);
+        border: 1px solid var(--idees-border);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    div.stButton > button {
+        background-color: var(--idees-green);
+        color: white;
+        border: none;
         border-radius: 8px;
-    }
-
-    /* Navigation radio : apparence plus proche d'un menu */
-    [data-testid="stSidebar"] [role="radiogroup"] {
-        gap: 0.25rem;
-    }
-
-    [data-testid="stSidebar"] [role="radio"] {
-        border-radius: 8px;
-        padding: 0.42rem 0.55rem;
-        transition: background 0.15s ease;
-    }
-
-    [data-testid="stSidebar"] [role="radio"]:hover {
-        background: rgba(0, 168, 120, 0.16);
-    }
-
-    [data-testid="stSidebar"] [role="radio"][aria-checked="true"] {
-        background: var(--idees-green);
-    }
-
-    [data-testid="stSidebar"] [role="radio"][aria-checked="true"] p,
-    [data-testid="stSidebar"] [role="radio"][aria-checked="true"] span {
-        color: #FFFFFF !important;
         font-weight: 700;
     }
 
-    [data-testid="stSidebar"] hr {
-        border-color: rgba(255,255,255,0.16);
+    div.stButton > button:hover {
+        background-color: var(--idees-green-dark);
+        color: white;
     }
 
-    /* ===== CARTES METRIQUES ===== */
-    [data-testid="stMetric"] {
-        background: #FFFFFF;
-        border: 1px solid var(--idees-border);
-        border-left: 4px solid var(--idees-green);
-        border-radius: 12px;
-        padding: 1rem 1.1rem;
-        box-shadow: 0 2px 10px rgba(39, 55, 61, 0.05);
+    .stProgress > div > div > div > div {
+        background-color: var(--idees-green);
     }
 
-    [data-testid="stMetricLabel"] {
-        color: #657078 !important;
-        font-weight: 600;
-    }
-
-    [data-testid="stMetricValue"] {
-        color: var(--idees-anthracite) !important;
-        font-weight: 750;
-    }
-
-    /* ===== BOUTONS ===== */
-    .stButton > button {
-        background: var(--idees-green);
-        color: #FFFFFF;
-        border: 1px solid var(--idees-green);
-        border-radius: 8px;
-        font-weight: 650;
-        min-height: 2.55rem;
-        box-shadow: none;
-    }
-
-    .stButton > button:hover {
-        background: var(--idees-green-dark);
-        border-color: var(--idees-green-dark);
-        color: #FFFFFF;
-    }
-
-    .stButton > button:focus {
-        box-shadow: 0 0 0 2px rgba(0,168,120,0.22);
-    }
-
-    /* ===== INPUTS / SELECTS ===== */
-    [data-baseweb="input"] > div,
-    [data-baseweb="textarea"] > div,
-    [data-baseweb="select"] > div {
-        border-color: var(--idees-border);
-        border-radius: 8px;
-    }
-
-    [data-baseweb="input"] > div:focus-within,
-    [data-baseweb="textarea"] > div:focus-within,
-    [data-baseweb="select"] > div:focus-within {
-        border-color: var(--idees-green);
-        box-shadow: 0 0 0 1px var(--idees-green);
-    }
-
-    /* ===== EXPANDERS / BLOCS ===== */
-    [data-testid="stExpander"] {
-        border: 1px solid var(--idees-border);
-        border-radius: 10px;
-        background: #FFFFFF;
-    }
-
-    [data-testid="stExpander"] summary:hover {
-        color: var(--idees-green);
-    }
-
-    /* ===== PROGRESS ===== */
-    [data-testid="stProgressBar"] > div > div {
-        background: var(--idees-green);
-    }
-
-    /* ===== SEPARATEURS ===== */
-    hr {
-        border-color: var(--idees-border);
-    }
-
-    /* ===== BANDEAUX / ZONES NATIVES STREAMLIT ===== */
-    [data-testid="stAlert"] {
-        border-radius: 10px;
-        background: var(--idees-green-light);
-        border-left: 4px solid var(--idees-green);
-    }
-
-    /* Barres et en-têtes des zones de recherche / sélection */
-    [data-testid="stTextInput"] input,
-    [data-testid="stTextArea"] textarea,
-    [data-testid="stDateInput"] input {
-        background: #FFFFFF;
-    }
-
-    [data-testid="stTextInput"] input:focus,
-    [data-testid="stTextArea"] textarea:focus,
-    [data-testid="stDateInput"] input:focus {
-        border-color: var(--idees-green) !important;
-        box-shadow: 0 0 0 1px var(--idees-green) !important;
-    }
-
-    /* En-têtes de tableaux */
-    [data-testid="stDataFrame"] th {
-        background: var(--idees-green-light) !important;
-        color: var(--idees-anthracite) !important;
-    }
-
-    /* Onglets / bandeaux de navigation Streamlit */
-    [data-baseweb="tab-list"] {
-        background: var(--idees-green-light);
-        border-radius: 8px;
-        padding: 3px;
-    }
-
-    [data-baseweb="tab"][aria-selected="true"] {
-        color: var(--idees-green-dark) !important;
-    }
-
-    /* ===== LIENS ===== */
-    a {
-        color: var(--idees-green-dark);
-    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
+
+# ============================================================
+# DONNÉES GÉNÉRALES
+# ============================================================
 
 AGENCES = [
     "Alençon",
@@ -308,7 +178,6 @@ AGENCES = [
     "Saint-Malo",
 ]
 
-
 STATUTS_SUIVI = [
     "Candidature envoyée",
     "Entretien programmé",
@@ -318,149 +187,96 @@ STATUTS_SUIVI = [
 ]
 
 
+# ============================================================
+# INITIALISATION
+# ============================================================
+
 init_db()
 
 
 # ============================================================
-# EXTRACTION CANDIDAT
+# FONCTIONS UTILITAIRES
 # ============================================================
 
-def extraire_candidat(nom_fichier):
-
-    nom = re.sub(
-        r"\.pdf$",
-        "",
-        nom_fichier,
-        flags=re.IGNORECASE,
+def afficher_metric(titre, valeur):
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-title">{titre}</div>
+            <div class="metric-value">{valeur}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    nom = re.sub(
-        r"\.docx$",
-        "",
-        nom,
-        flags=re.IGNORECASE,
-    )
 
-    nom = re.sub(
-        r"[_\-]+",
-        " ",
-        nom,
-    )
+def nettoyer_texte(texte):
+    if not texte:
+        return ""
 
-    nom = re.sub(
+    return re.sub(
         r"\s+",
         " ",
-        nom,
+        str(texte)
     ).strip()
 
-    return nom.title() if nom else "Candidat inconnu"
-
 
 # ============================================================
-# EXTRACTION COMPETENCES
+# SIDEBAR
 # ============================================================
 
-def extraire_competences(texte):
+with st.sidebar:
 
-    trouve = set()
+    # --------------------------------------------------------
+    # VRAI LOGO ID'EES INTERIM
+    # --------------------------------------------------------
 
-    texte_min = texte.lower()
-
-    for mots in METIERS.values():
-
-        for mot in mots:
-
-            if mot.lower() in texte_min:
-
-                trouve.add(mot)
-
-    for competence in extraire_competences_pro(texte):
-
-        trouve.add(competence)
-
-    return ", ".join(
-        sorted(trouve)
+    st.image(
+        "logo.png",
+        width=170,
     )
 
-
-# ============================================================
-# EXTRACTION CACES
-# ============================================================
-
-def extraire_caces(texte):
-
-    resultats = {
-        m.upper()
-        for m in re.findall(
-            r"r4\d{2}",
-            texte,
-            flags=re.IGNORECASE,
-        )
-    }
-
-    return ", ".join(
-        sorted(resultats)
+    st.markdown(
+        """
+        <div style="
+            text-align:center;
+            margin-top:-8px;
+            margin-bottom:22px;
+        ">
+            <div style="
+                font-size:17px;
+                font-weight:800;
+                color:white;
+                letter-spacing:0.2px;
+            ">
+                ID'EES INTERIM
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-
-# ============================================================
-# EXTRACTION PERMIS
-# ============================================================
-
-def extraire_permis(texte):
-
-    resultats = {
-        m.upper()
-        for m in re.findall(
-            r"permis\s+([a-z]{1,2}\d?)",
-            texte,
-            flags=re.IGNORECASE,
-        )
-    }
-
-    return ", ".join(
-        sorted(resultats)
+    agence = st.selectbox(
+        "Agence",
+        AGENCES,
     )
 
+    st.markdown("---")
 
-# ============================================================
-# BARRE LATERALE
-# ============================================================
-
-st.sidebar.image(
-    "logo.png",
-    width=180,
-)
-
-st.sidebar.title("ID'EES INTERIM")
-
-agence = st.sidebar.selectbox(
-    "Agence",
-    AGENCES,
-)
-
-
-page = st.sidebar.radio(
-    "Navigation",
-    [
-        "📊 Tableau de bord",
-        "🌐 Tableau de bord DZ",
-        "📄 Importer un CV",
-        "📂 CVthèque",
-        "🏢 Importer une fiche de poste",
-        "📁 Postethèque",
-        "🔍 Matching",
-        "📋 Suivi des candidatures",
-        "📈 Statistiques",
-    ],
-)
-
-
-st.sidebar.markdown("---")
-
-st.sidebar.caption(
-    f"Agence sélectionnée : **{agence}**"
-)
+    page = st.radio(
+        "Navigation",
+        [
+            "📊 Tableau de bord",
+            "🌍 Tableau de bord DZ",
+            "📄 Importer un CV",
+            "📚 CVthèque",
+            "💼 Importer une fiche de poste",
+            "📋 Postethèque",
+            "🎯 Matching",
+            "📌 Suivi des candidatures",
+            "📈 Statistiques",
+        ],
+    )
 
 
 # ============================================================
@@ -469,1694 +285,1053 @@ st.sidebar.caption(
 
 if page == "📊 Tableau de bord":
 
-    st.title(
-        "📊 Tableau de bord"
+    st.markdown(
+        '<div class="idees-title">📊 Tableau de bord</div>',
+        unsafe_allow_html=True,
     )
 
-    st.caption(
-        f"Agence : {agence}"
+    st.markdown(
+        f'<div class="idees-subtitle">Agence de {agence}</div>',
+        unsafe_allow_html=True,
     )
 
-    # --------------------------------------------------------
-    # INDICATEURS PRINCIPAUX
-    # --------------------------------------------------------
+    cvs_dashboard = lister_cv(agence)
+    suivis_dashboard = lister_suivi(agence)
+    postes_dashboard = recuperer_postes(agence)
+
+    nombre_cv = len(cvs_dashboard)
+    nombre_postes = len(postes_dashboard)
+
+    nombre_entretiens = sum(
+        1
+        for ligne in suivis_dashboard
+        if ligne.get("statut") == "Entretien programmé"
+    )
+
+    nombre_recrutements = sum(
+        1
+        for ligne in suivis_dashboard
+        if ligne.get("statut") == "Recruté"
+    )
 
     col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric(
-        "CV enregistrés",
-        compter_cv(agence),
-    )
+    with col1:
+        afficher_metric("CVthèque", nombre_cv)
 
-    col2.metric(
-        "Postes enregistrés",
-        compter_postes(agence),
-    )
+    with col2:
+        afficher_metric("Postes", nombre_postes)
 
-    col3.metric(
-        "Entretiens programmés",
-        compter_suivi(
-            agence,
-            "Entretien programmé",
-        ),
-    )
+    with col3:
+        afficher_metric("Entretiens", nombre_entretiens)
 
-    col4.metric(
-        "Recrutements",
-        compter_suivi(
-            agence,
-            "Recruté",
-        ),
-    )
-
-    # --------------------------------------------------------
-    # RECUPERATION DES DONNEES DE L'AGENCE
-    # --------------------------------------------------------
-
-    cvs_dashboard = lister_cv(
-        agence
-    )
-
-    suivis_dashboard = lister_suivi(
-        agence
-    )
-
-    postes_dashboard = recuperer_postes(
-        agence
-    )
+    with col4:
+        afficher_metric("Recrutements", nombre_recrutements)
 
     st.markdown("---")
 
     # --------------------------------------------------------
-    # TAUX DE TRANSFORMATION CLIENTS / PROSPECTS
+    # CLIENTS / PROSPECTS
     # --------------------------------------------------------
 
-    st.subheader(
-        "🎯 Taux de transformation"
-    )
+    st.subheader("Transformation Clients / Prospects")
 
-    candidatures_clients = [
-        ligne
+    clients_envoyes = sum(
+        1
         for ligne in suivis_dashboard
         if ligne.get("type_entreprise") == "🟢 Client"
-        and ligne.get("candidat")
         and ligne.get("statut") != "Commande non pourvue"
-    ]
+    )
 
-    candidatures_prospects = [
-        ligne
+    clients_recrutes = sum(
+        1
+        for ligne in suivis_dashboard
+        if ligne.get("type_entreprise") == "🟢 Client"
+        and ligne.get("statut") == "Recruté"
+    )
+
+    prospects_envoyes = sum(
+        1
         for ligne in suivis_dashboard
         if ligne.get("type_entreprise") == "🟠 Prospect"
-        and ligne.get("candidat")
         and ligne.get("statut") != "Commande non pourvue"
-    ]
+    )
 
-    recrutes_clients = [
-        ligne
-        for ligne in candidatures_clients
-        if ligne.get("statut") == "Recruté"
-    ]
+    prospects_recrutes = sum(
+        1
+        for ligne in suivis_dashboard
+        if ligne.get("type_entreprise") == "🟠 Prospect"
+        and ligne.get("statut") != "Commande non pourvue"
+        and ligne.get("statut") == "Recruté"
+    )
 
-    recrutes_prospects = [
-        ligne
-        for ligne in candidatures_prospects
-        if ligne.get("statut") == "Recruté"
-    ]
-
-    taux_clients = (
-        len(recrutes_clients) / len(candidatures_clients) * 100
-        if candidatures_clients
+    taux_client = (
+        clients_recrutes / clients_envoyes * 100
+        if clients_envoyes
         else 0
     )
 
-    taux_prospects = (
-        len(recrutes_prospects) / len(candidatures_prospects) * 100
-        if candidatures_prospects
+    taux_prospect = (
+        prospects_recrutes / prospects_envoyes * 100
+        if prospects_envoyes
         else 0
     )
 
     col1, col2 = st.columns(2)
 
     with col1:
-
-        st.markdown(
-            "### 🎯 Taux de transformation **clients**"
-        )
-
-        c1, c2, c3 = st.columns(3)
-
-        c1.metric(
-            "Envoyés",
-            len(candidatures_clients),
-        )
-
-        c2.metric(
-            "Recrutés",
-            len(recrutes_clients),
-        )
-
-        c3.metric(
-            "Taux",
-            f"{taux_clients:.1f} %",
+        afficher_metric(
+            "🟢 Taux de transformation Clients",
+            f"{taux_client:.1f} %",
         )
 
     with col2:
-
-        st.markdown(
-            "### 🎯 Taux de transformation **prospects**"
+        afficher_metric(
+            "🟠 Taux de transformation Prospects",
+            f"{taux_prospect:.1f} %",
         )
-
-        c1, c2, c3 = st.columns(3)
-
-        c1.metric(
-            "Envoyés",
-            len(candidatures_prospects),
-        )
-
-        c2.metric(
-            "Recrutés",
-            len(recrutes_prospects),
-        )
-
-        c3.metric(
-            "Taux",
-            f"{taux_prospects:.1f} %",
-        )
-
-    st.caption(
-        "Le taux est calculé sur les candidatures envoyées "
-        "(hors commandes non pourvues)."
-    )
 
     # --------------------------------------------------------
-    # REPARTITION DES PROFILS ENVOYES
+    # PROFILS
     # --------------------------------------------------------
 
-    st.markdown("---")
+    st.subheader("Transformation par profil")
 
-    st.subheader(
-        "👤 Répartition des profils envoyés"
-    )
-
-    # On relie le candidat du suivi à son CV afin de retrouver
-    # le type de profil enregistré : Intérimaire ou Candidat.
-    profils_par_candidat = {}
+    profils_dashboard = {}
 
     for cv in cvs_dashboard:
 
-        nom_candidat = (
-            cv.get("candidat") or ""
-        ).strip().lower()
+        candidat = cv.get("candidat")
+        type_profil = cv.get("type_profil")
 
-        if nom_candidat and nom_candidat not in profils_par_candidat:
+        if not type_profil:
+            continue
 
-            profils_par_candidat[nom_candidat] = (
-                cv.get("type_profil") or ""
-            )
+        profils_dashboard[candidat] = type_profil
 
-    statistiques_profils = []
+    profil_envoyes = {
+        "Intérimaire": 0,
+        "Candidat": 0,
+    }
 
-    for profil in [
-        "🟢 Intérimaire",
-        "🟡 Candidat",
-    ]:
-
-        lignes_profil = []
-
-        for ligne in suivis_dashboard:
-
-            candidat = (
-                ligne.get("candidat") or ""
-            ).strip().lower()
-
-            type_entreprise = (
-                ligne.get("type_entreprise") or ""
-            )
-
-            statut = ligne.get(
-                "statut"
-            )
-
-            type_profil = profils_par_candidat.get(
-                candidat,
-                "",
-            )
-
-            if (
-                candidat
-                and type_profil == profil
-                and type_entreprise in [
-                    "🟢 Client",
-                    "🟠 Prospect",
-                ]
-                and statut != "Commande non pourvue"
-            ):
-
-                lignes_profil.append(
-                    ligne
-                )
-
-        recrutes_profil = [
-            ligne
-            for ligne in lignes_profil
-            if ligne.get("statut") == "Recruté"
-        ]
-
-        taux_profil = (
-            len(recrutes_profil) / len(lignes_profil) * 100
-            if lignes_profil
-            else 0
-        )
-
-        statistiques_profils.append(
-            {
-                "Profil": profil,
-                "Nombre envoyé": len(lignes_profil),
-                "Recruté": len(recrutes_profil),
-                "Taux de transformation": (
-                    f"{taux_profil:.1f} %"
-                ),
-            }
-        )
-
-    st.dataframe(
-        statistiques_profils,
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    # --------------------------------------------------------
-    # METIERS PRESENTS DANS LA CVTHEQUE
-    # --------------------------------------------------------
-
-    st.markdown("---")
-
-    st.subheader(
-        "👷 Métiers présents dans la CVthèque"
-    )
-
-    compte_metiers = {}
-
-    for cv in cvs_dashboard:
-
-        metier = (
-            cv.get("metier") or ""
-        ).strip()
-
-        if metier:
-
-            compte_metiers[metier] = (
-                compte_metiers.get(metier, 0) + 1
-            )
-
-    if compte_metiers:
-
-        compte_metiers = dict(
-            sorted(
-                compte_metiers.items(),
-                key=lambda element: element[1],
-                reverse=True,
-            )
-        )
-
-        st.bar_chart(
-            compte_metiers,
-            color="#00A878",
-        )
-
-    else:
-
-        st.info(
-            "Aucun métier renseigné dans la CVthèque."
-        )
-
-    # --------------------------------------------------------
-    # METIERS RECHERCHES / PRESSENTIS
-    # --------------------------------------------------------
-
-    st.subheader(
-        "🎯 Métiers recherchés / pressentis"
-    )
-
-    compte_metiers_recherches = {}
-
-    for cv in cvs_dashboard:
-
-        valeur = (
-            cv.get("metiers_recherches") or ""
-        )
-
-        for metier_recherche in valeur.split(","):
-
-            metier_recherche = metier_recherche.strip()
-
-            if metier_recherche:
-
-                compte_metiers_recherches[
-                    metier_recherche
-                ] = (
-                    compte_metiers_recherches.get(
-                        metier_recherche,
-                        0,
-                    ) + 1
-                )
-
-    if compte_metiers_recherches:
-
-        compte_metiers_recherches = dict(
-            sorted(
-                compte_metiers_recherches.items(),
-                key=lambda element: element[1],
-                reverse=True,
-            )
-        )
-
-        st.bar_chart(
-            compte_metiers_recherches,
-            color="#00A878",
-        )
-
-    else:
-
-        st.info(
-            "Aucun métier recherché / pressenti renseigné."
-        )
-
-    # --------------------------------------------------------
-    # POSTES LES PLUS DEMANDES
-    # --------------------------------------------------------
-
-    st.subheader(
-        "🏢 Postes les plus demandés"
-    )
-
-    compte_postes_demandes = {}
-
-    for poste in postes_dashboard:
-
-        intitule = (
-            poste.get("poste") or ""
-        ).strip()
-
-        if intitule:
-
-            compte_postes_demandes[intitule] = (
-                compte_postes_demandes.get(
-                    intitule,
-                    0,
-                ) + 1
-            )
-
-    if compte_postes_demandes:
-
-        compte_postes_demandes = dict(
-            sorted(
-                compte_postes_demandes.items(),
-                key=lambda element: element[1],
-                reverse=True,
-            )
-        )
-
-        st.bar_chart(
-            compte_postes_demandes,
-            color="#00A878",
-        )
-
-    else:
-
-        st.info(
-            "Aucun poste enregistré pour cette agence."
-        )
-
-    # --------------------------------------------------------
-    # REPARTITION DES CANDIDATURES PAR STATUT
-    # --------------------------------------------------------
-
-    st.subheader(
-        "📋 Répartition des candidatures par statut"
-    )
-
-    compte_statuts = {}
+    profil_recrutes = {
+        "Intérimaire": 0,
+        "Candidat": 0,
+    }
 
     for ligne in suivis_dashboard:
 
-        statut = (
-            ligne.get("statut") or ""
+        type_profil = ligne.get("type_profil")
+
+        if type_profil not in profil_envoyes:
+            continue
+
+        if ligne.get("statut") != "Commande non pourvue":
+            profil_envoyes[type_profil] += 1
+
+        if ligne.get("statut") == "Recruté":
+            profil_recrutes[type_profil] += 1
+
+    col1, col2 = st.columns(2)
+
+    for col, profil in [
+        (col1, "Intérimaire"),
+        (col2, "Candidat"),
+    ]:
+
+        taux = (
+            profil_recrutes[profil]
+            / profil_envoyes[profil]
+            * 100
+            if profil_envoyes[profil]
+            else 0
         )
 
-        if statut:
-
-            compte_statuts[statut] = (
-                compte_statuts.get(
-                    statut,
-                    0,
-                ) + 1
+        with col:
+            afficher_metric(
+                profil,
+                f"{taux:.1f} %",
             )
 
-    if compte_statuts:
+    # --------------------------------------------------------
+    # COMMANDES NON POURVUES
+    # --------------------------------------------------------
 
-        st.bar_chart(
-            compte_statuts,
-            color="#00A878",
+    non_pourvues = sum(
+        1
+        for ligne in suivis_dashboard
+        if ligne.get("statut") == "Commande non pourvue"
+    )
+
+    total_candidatures = len(suivis_dashboard)
+
+    poids_non_pourvues = (
+        non_pourvues / total_candidatures * 100
+        if total_candidatures
+        else 0
+    )
+
+    st.subheader("Commandes non pourvues")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        afficher_metric(
+            "Commandes non pourvues",
+            non_pourvues,
         )
 
+    with col2:
+        afficher_metric(
+            "Poids des non pourvues",
+            f"{poids_non_pourvues:.1f} %",
+        )
+
+    # --------------------------------------------------------
+    # MÉTIERS
+    # --------------------------------------------------------
+
+    st.subheader("Répartition des métiers")
+
+    metiers = {}
+
+    for cv in cvs_dashboard:
+
+        metier = cv.get("metier")
+
+        if metier:
+            metiers[metier] = (
+                metiers.get(metier, 0) + 1
+            )
+
+    if metiers:
+        st.bar_chart(metiers)
     else:
+        st.info("Aucun métier disponible.")
 
-        st.info(
-            "Aucune candidature suivie pour le moment."
-        )
+    # --------------------------------------------------------
+    # MÉTIERS RECHERCHÉS
+    # --------------------------------------------------------
+
+    st.subheader("Métiers recherchés")
+
+    metiers_recherches = {}
+
+    for cv in cvs_dashboard:
+
+        texte = cv.get("metiers_recherches")
+
+        if not texte:
+            continue
+
+        for metier in str(texte).split(","):
+
+            metier = metier.strip()
+
+            if metier:
+                metiers_recherches[metier] = (
+                    metiers_recherches.get(metier, 0) + 1
+                )
+
+    if metiers_recherches:
+        st.bar_chart(metiers_recherches)
+
+    # --------------------------------------------------------
+    # POSTES DEMANDÉS
+    # --------------------------------------------------------
+
+    st.subheader("Postes demandés")
+
+    postes_demandes = {}
+
+    for poste in postes_dashboard:
+
+        nom_poste = poste.get("poste")
+
+        if nom_poste:
+            postes_demandes[nom_poste] = (
+                postes_demandes.get(nom_poste, 0) + 1
+            )
+
+    if postes_demandes:
+        st.bar_chart(postes_demandes)
+
+    # --------------------------------------------------------
+    # STATUTS
+    # --------------------------------------------------------
+
+    st.subheader("Répartition des candidatures")
+
+    repartition = repartition_suivi(agence)
+
+    if repartition:
+        st.bar_chart(repartition)
+    else:
+        st.info("Aucune candidature enregistrée.")
+
 
 # ============================================================
 # TABLEAU DE BORD DZ
 # ============================================================
 
-elif page == "🌐 Tableau de bord DZ":
+elif page == "🌍 Tableau de bord DZ":
 
-    st.title(
-        "🌐 Tableau de bord DZ"
+    st.markdown(
+        '<div class="idees-title">🌍 Tableau de bord DZ</div>',
+        unsafe_allow_html=True,
     )
 
-    st.caption(
-        "Vue régionale — comparaison des agences ID'EES INTERIM"
+    st.markdown(
+        '<div class="idees-subtitle">Vue régionale</div>',
+        unsafe_allow_html=True,
     )
 
-    st.info(
-        "Cette page permet à chaque agence de voir "
-        "l'activité des autres agences et de se situer "
-        "par rapport au réseau."
+    stats_dz = statistiques_dz(AGENCES)
+
+    total_cv = sum(
+        ligne["cv"]
+        for ligne in stats_dz.values()
     )
 
-    # --------------------------------------------------------
-    # Récupération des statistiques
-    # --------------------------------------------------------
+    total_postes = sum(
+        ligne["postes"]
+        for ligne in stats_dz.values()
+    )
 
-    try:
+    total_candidatures = sum(
+        ligne["candidatures"]
+        for ligne in stats_dz.values()
+    )
 
-        stats_dz = statistiques_dz(
-            AGENCES
+    total_entretiens = sum(
+        ligne["entretiens"]
+        for ligne in stats_dz.values()
+    )
+
+    total_recrutements = sum(
+        ligne["recrutements"]
+        for ligne in stats_dz.values()
+    )
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    with col1:
+        afficher_metric("CV", total_cv)
+
+    with col2:
+        afficher_metric("Postes", total_postes)
+
+    with col3:
+        afficher_metric("Candidatures", total_candidatures)
+
+    with col4:
+        afficher_metric("Entretiens", total_entretiens)
+
+    with col5:
+        afficher_metric("Recrutements", total_recrutements)
+
+    st.markdown("---")
+
+    st.subheader("Performance par agence")
+
+    tableau_dz = []
+
+    for nom_agence, data in stats_dz.items():
+
+        candidatures = data["candidatures"]
+
+        suivis_agence = lister_suivi(nom_agence)
+
+        candidatures_eligibles = sum(
+            1
+            for ligne in suivis_agence
+            if ligne.get("statut") != "Commande non pourvue"
         )
 
-    except Exception as erreur:
+        recrutements = data["recrutements"]
 
-        st.error(
-            "Impossible de récupérer les statistiques DZ."
+        taux_transformation = (
+            recrutements
+            / candidatures_eligibles
+            * 100
+            if candidatures_eligibles
+            else 0
         )
 
-        st.exception(erreur)
-
-        stats_dz = {}
-
-    if stats_dz:
-
-        # ----------------------------------------------------
-        # TOTAL DZ
-        # ----------------------------------------------------
-
-        total_cv = sum(
-            stats["cv"]
-            for stats in stats_dz.values()
+        tableau_dz.append(
+            {
+                "Agence": nom_agence,
+                "CV": data["cv"],
+                "Postes": data["postes"],
+                "Candidatures": candidatures,
+                "Entretiens": data["entretiens"],
+                "Recrutements": recrutements,
+                "Clients": data["clients"],
+                "Prospects": data["prospects"],
+                "Transformation": f"{taux_transformation:.1f} %",
+            }
         )
 
-        total_postes = sum(
-            stats["postes"]
-            for stats in stats_dz.values()
-        )
+    tableau_dz = sorted(
+        tableau_dz,
+        key=lambda x: (
+            x["Recrutements"],
+            x["Candidatures"],
+            x["Postes"],
+        ),
+        reverse=True,
+    )
 
-        total_candidatures = sum(
-            stats["candidatures"]
-            for stats in stats_dz.values()
-        )
+    st.dataframe(
+        tableau_dz,
+        use_container_width=True,
+        hide_index=True,
+    )
 
-        total_entretiens = sum(
-            stats["entretiens"]
-            for stats in stats_dz.values()
-        )
+    st.subheader("Candidatures par agence")
 
-        total_recrutements = sum(
-            stats["recrutements"]
-            for stats in stats_dz.values()
-        )
+    candidatures_chart = {
+        agence_nom: data["candidatures"]
+        for agence_nom, data in stats_dz.items()
+    }
 
-        total_clients = sum(
-            stats["clients"]
-            for stats in stats_dz.values()
-        )
+    st.bar_chart(candidatures_chart)
 
-        total_prospects = sum(
-            stats["prospects"]
-            for stats in stats_dz.values()
-        )
+    st.subheader("Recrutements par agence")
 
-        st.subheader(
-            "📊 Activité totale de la DZ"
-        )
+    recrutements_chart = {
+        agence_nom: data["recrutements"]
+        for agence_nom, data in stats_dz.items()
+    }
 
-        col1, col2, col3, col4 = st.columns(4)
+    st.bar_chart(recrutements_chart)
 
-        col1.metric(
-            "CV",
-            total_cv,
-        )
+    st.subheader("CV par agence")
 
-        col2.metric(
-            "Postes",
-            total_postes,
-        )
+    cv_chart = {
+        agence_nom: data["cv"]
+        for agence_nom, data in stats_dz.items()
+    }
 
-        col3.metric(
-            "Candidatures",
-            total_candidatures,
-        )
+    st.bar_chart(cv_chart)
 
-        col4.metric(
-            "Recrutements",
-            total_recrutements,
-        )
+    st.subheader("Classement")
 
-        col5, col6, col7 = st.columns(3)
+    classement = sorted(
+        tableau_dz,
+        key=lambda x: x["Recrutements"],
+        reverse=True,
+    )
 
-        col5.metric(
-            "Entretiens",
-            total_entretiens,
-        )
-
-        col6.metric(
-            "🟢 Clients",
-            total_clients,
-        )
-
-        col7.metric(
-            "🟠 Prospects",
-            total_prospects,
-        )
-
-        st.markdown("---")
-
-        # ----------------------------------------------------
-        # TABLEAU COMPARATIF
-        # ----------------------------------------------------
-
-        st.subheader(
-            "🏢 Comparatif des agences"
-        )
-
-        tableau_agences = []
-
-        for nom_agence, stats in stats_dz.items():
-
-            # Même définition que dans le tableau de bord agence :
-            # recrutement(s) / candidature(s) envoyée(s)
-            # pour chaque type d'entreprise.
-            suivis_agence_dz = lister_suivi(
-                nom_agence
-            )
-
-            candidatures_clients = [
-                ligne
-                for ligne in suivis_agence_dz
-                if ligne.get("type_entreprise") == "🟢 Client"
-                and ligne.get("candidat")
-                and ligne.get("statut") != "Commande non pourvue"
-            ]
-
-            candidatures_prospects = [
-                ligne
-                for ligne in suivis_agence_dz
-                if ligne.get("type_entreprise") == "🟠 Prospect"
-                and ligne.get("candidat")
-                and ligne.get("statut") != "Commande non pourvue"
-            ]
-
-            recrutes_clients = [
-                ligne
-                for ligne in candidatures_clients
-                if ligne.get("statut") == "Recruté"
-            ]
-
-            recrutes_prospects = [
-                ligne
-                for ligne in candidatures_prospects
-                if ligne.get("statut") == "Recruté"
-            ]
-
-            taux_clients = (
-                len(recrutes_clients)
-                / len(candidatures_clients)
-                * 100
-                if candidatures_clients
-                else 0
-            )
-
-            taux_prospects = (
-                len(recrutes_prospects)
-                / len(candidatures_prospects)
-                * 100
-                if candidatures_prospects
-                else 0
-            )
-
-            tableau_agences.append(
-                {
-                    "Agence": nom_agence,
-                    "CV": stats["cv"],
-                    "Postes": stats["postes"],
-                    "Candidatures": stats["candidatures"],
-                    "Entretiens": stats["entretiens"],
-                    "Recrutements": stats["recrutements"],
-                    "Clients": stats["clients"],
-                    "Taux transformation client": f"{taux_clients:.1f} %",
-                    "Prospects": stats["prospects"],
-                    "Taux transformation prospect": f"{taux_prospects:.1f} %",
-                }
-            )
-
-        tableau_agences.sort(
-            key=lambda ligne: (
-                ligne["Recrutements"],
-                ligne["Candidatures"],
-                ligne["Postes"],
-            ),
-            reverse=True,
-        )
-
-        st.dataframe(
-            tableau_agences,
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        st.markdown("---")
-
-        # ----------------------------------------------------
-        # CLASSEMENT
-        # ----------------------------------------------------
-
-        st.subheader(
-            "🏆 Classement des recrutements"
-        )
-
-        classement = sorted(
-            stats_dz.items(),
-            key=lambda element: (
-                element[1]["recrutements"],
-                element[1]["candidatures"],
-                element[1]["postes"],
-            ),
-            reverse=True,
-        )
-
-        for position, (
-            nom_agence,
-            stats
-        ) in enumerate(
-            classement,
-            start=1
-        ):
-
-            if position == 1:
-                prefixe = "🥇"
-
-            elif position == 2:
-                prefixe = "🥈"
-
-            elif position == 3:
-                prefixe = "🥉"
-
-            else:
-                prefixe = f"{position}."
-
-            st.write(
-                f"**{prefixe} {nom_agence}** — "
-                f"{stats['recrutements']} recrutement(s) · "
-                f"{stats['candidatures']} candidature(s) · "
-                f"{stats['postes']} poste(s)"
-            )
-
-        st.markdown("---")
-
-        # ----------------------------------------------------
-        # GRAPHIQUES
-        # ----------------------------------------------------
-
-        st.subheader(
-            "📈 Activité par agence"
-        )
+    for index, ligne in enumerate(
+        classement,
+        start=1,
+    ):
 
         st.write(
-            "Nombre de candidatures"
-        )
-
-        graphique_candidatures = {
-            agence_nom: stats["candidatures"]
-            for agence_nom, stats in stats_dz.items()
-        }
-
-        st.bar_chart(
-            graphique_candidatures,
-            color="#00A878",
-        )
-
-        st.write(
-            "Nombre de recrutements"
-        )
-
-        graphique_recrutements = {
-            agence_nom: stats["recrutements"]
-            for agence_nom, stats in stats_dz.items()
-        }
-
-        st.bar_chart(
-            graphique_recrutements,
-            color="#00A878",
-        )
-
-        st.write(
-            "Nombre de CV enregistrés"
-        )
-
-        graphique_cv = {
-            agence_nom: stats["cv"]
-            for agence_nom, stats in stats_dz.items()
-        }
-
-        st.bar_chart(
-            graphique_cv,
-            color="#00A878",
+            f"**{index}. {ligne['Agence']}** — "
+            f"{ligne['Recrutements']} recrutement(s)"
         )
 
 
 # ============================================================
-# IMPORT CV
+# IMPORTER UN CV
 # ============================================================
 
 elif page == "📄 Importer un CV":
 
-    st.title(
-        "📄 Importer un CV"
+    st.markdown(
+        '<div class="idees-title">📄 Importer un CV</div>',
+        unsafe_allow_html=True,
     )
 
     fichier = st.file_uploader(
-        "Sélectionnez un CV (PDF ou Word)",
-        type=["pdf", "docx"],
+        "Déposer un CV",
+        type=[
+            "pdf",
+            "docx",
+            "txt",
+        ],
     )
 
-    if fichier is not None:
+    if fichier:
 
-        texte = extract_text(
-            fichier
-        )
+        if st.button("Analyser le CV"):
 
-        if not texte:
+            with st.spinner("Analyse du CV en cours..."):
 
-            st.error(
-                "Impossible d'extraire le texte de ce fichier "
-                "(document scanné ou vide ?)."
-            )
+                texte = extract_text(fichier)
 
-        else:
+                texte = nettoyer_texte(texte)
 
-            candidat_detecte = extraire_candidat(
-                fichier.name
-            )
+                metier = detecter_metier(texte)
 
-            metier_detecte = detecter_metier(
-                texte
-            )
-
-            competences_detectees = extraire_competences(
-                texte
-            )
-
-            taches_detectees = ", ".join(
-                extraire_taches(
+                competences = extraire_competences_pro(
                     texte
                 )
-            )
 
-            caces_detectes = extraire_caces(
-                texte
-            )
-
-            permis_detectes = extraire_permis(
-                texte
-            )
-
-            st.success(
-                "CV analysé avec succès. "
-                "Vérifiez les informations avant d'enregistrer."
-            )
-
-            with st.form("form_cv"):
-
-                candidat = st.text_input(
-                    "Nom du candidat",
-                    value=candidat_detecte,
+                taches = extraire_taches(
+                    texte
                 )
 
-                metier = st.text_input(
-                    "Métier détecté",
-                    value=metier_detecte,
-                )
+            st.success("CV analysé.")
 
-                metiers_recherches = st.text_input(
-                    "Métiers recherchés / métiers pressentis",
-                    value="",
-                    help=(
-                        "Indiquez un ou plusieurs métiers que le candidat "
-                        "souhaite exercer, séparés par des virgules."
-                    ),
-                )
+            candidat = st.text_input(
+                "Nom du candidat",
+            )
 
+            type_profil = st.radio(
+                "Type de profil",
+                [
+                    "🟢 Intérimaire",
+                    "🟡 Candidat",
+                ],
+                horizontal=True,
+            )
+
+            metiers_recherches = st.text_input(
+                "Métiers recherchés",
+            )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
                 date_fin_mission = st.date_input(
-                    "📅 Fin de mission",
+                    "Date de fin de mission",
                     value=None,
                 )
 
+            with col2:
                 date_disponibilite = st.date_input(
-                    "📅 Date de disponibilité",
+                    "Date de disponibilité",
                     value=None,
                 )
 
-                competences = st.text_area(
-                    "Compétences détectées",
-                    value=competences_detectees,
-                )
+            caces = st.text_input(
+                "CACES",
+            )
 
-                taches = st.text_area(
-                    "Tâches / missions déjà réalisées",
-                    value=taches_detectees,
-                    help=(
-                        "Détectées automatiquement dans le CV. "
-                        "Vous pouvez corriger ou compléter."
-                    ),
-                )
+            permis = st.text_input(
+                "Permis",
+            )
 
-                caces = st.text_input(
-                    "CACES détectés",
-                    value=caces_detectes,
-                )
-
-                permis = st.text_input(
-                    "Permis détectés",
-                    value=permis_detectes,
-                )
-
-                type_profil = st.radio(
-                    "Type de profil",
-                    [
-                        "🟢 Intérimaire",
-                        "🟡 Candidat",
-                    ],
-                    horizontal=True,
-                )
-
-                valider = st.form_submit_button(
-                    "Enregistrer ce CV"
-                )
-
-            if valider:
-
-                try:
-
-                    enregistrer_cv(
-                        agence,
-                        fichier.name,
-                        candidat,
-                        metier,
-                        competences,
-                        caces,
-                        permis,
-                        type_profil,
-                        texte,
-                        taches,
-                        metiers_recherches,
-                        date_fin_mission.isoformat() if date_fin_mission else None,
-                        date_disponibilite.isoformat() if date_disponibilite else None,
-                    )
-
-                    st.success(
-                        f"CV de {candidat} enregistré "
-                        f"pour {agence}."
-                    )
-
-                    st.rerun()
-
-                except Exception as erreur:
-
-                    st.error(
-                        "Erreur lors de l'enregistrement "
-                        "du CV dans Supabase."
-                    )
-
-                    st.exception(erreur)
-
-            with st.expander(
-                "Voir le texte extrait du CV"
+            if st.button(
+                "💾 Enregistrer le CV"
             ):
 
-                st.text(
-                    texte
+                type_profil_stockage = (
+                    "Intérimaire"
+                    if "Intérimaire" in type_profil
+                    else "Candidat"
+                )
+
+                enregistrer_cv(
+                    agence=agence,
+                    nom_fichier=fichier.name,
+                    candidat=candidat,
+                    metier=metier,
+                    competences=competences,
+                    caces=caces,
+                    permis=permis,
+                    type_profil=type_profil_stockage,
+                    texte=texte,
+                    taches=taches,
+                    metiers_recherches=metiers_recherches,
+                    date_fin_mission=(
+                        str(date_fin_mission)
+                        if date_fin_mission
+                        else None
+                    ),
+                    date_disponibilite=(
+                        str(date_disponibilite)
+                        if date_disponibilite
+                        else None
+                    ),
+                )
+
+                st.success(
+                    "CV enregistré dans la CVthèque."
                 )
 
 
 # ============================================================
-# CVTHEQUE
+# CVTHÈQUE
 # ============================================================
 
-elif page == "📂 CVthèque":
+elif page == "📚 CVthèque":
 
-    st.title(
-        "📚 CVthèque"
+    st.markdown(
+        '<div class="idees-title">📚 CVthèque</div>',
+        unsafe_allow_html=True,
     )
+
+    cvs = lister_cv(agence)
 
     recherche = st.text_input(
-        "🔎 Rechercher un candidat, une compétence..."
+        "🔎 Rechercher un candidat, métier ou compétence"
     )
 
-    col1, col2, col3 = st.columns(3)
+    if recherche:
 
-    with col1:
+        recherche_lower = recherche.lower()
 
-        filtre_metier = st.text_input(
-            "👷 Métier"
-        )
-
-    with col2:
-
-        filtre_caces = st.text_input(
-            "🚜 CACES"
-        )
-
-    with col3:
-
-        filtre_permis = st.text_input(
-            "🚗 Permis"
-        )
-
-    cvs = lister_cv(
-        agence
-    )
+        cvs = [
+            cv
+            for cv in cvs
+            if recherche_lower in str(
+                cv.get("candidat", "")
+            ).lower()
+            or recherche_lower in str(
+                cv.get("metier", "")
+            ).lower()
+            or recherche_lower in str(
+                cv.get("competences", "")
+            ).lower()
+        ]
 
     if not cvs:
 
         st.info(
-            "Aucun CV enregistré pour cette agence."
+            "Aucun CV disponible."
         )
 
-    else:
+    for cv in cvs:
 
-        for cv in cvs:
+        with st.container():
 
-            cv_id = cv.get("id")
-            candidat = cv.get("candidat") or ""
-            metier = cv.get("metier") or ""
-            competences = cv.get("competences") or ""
-            taches = cv.get("taches") or ""
-            caces = cv.get("caces") or ""
-            permis = cv.get("permis") or ""
-            type_profil = cv.get("type_profil") or ""
-            date_creation = cv.get("date_creation") or ""
-            texte = cv.get("texte") or ""
-            metiers_recherches = cv.get("metiers_recherches") or ""
-            date_fin_mission = cv.get("date_fin_mission") or ""
-            date_disponibilite = cv.get("date_disponibilite") or ""
+            st.markdown(
+                "---"
+            )
 
-            texte_recherche = (
-                f"{candidat} "
-                f"{metier} "
-                f"{competences} "
-                f"{caces} "
-                f"{permis} "
-                f"{texte}"
-            ).lower()
+            col1, col2, col3 = st.columns(
+                [4, 2, 1]
+            )
 
-            if (
-                recherche
-                and recherche.lower()
-                not in texte_recherche
-            ):
-                continue
+            with col1:
 
-            if (
-                filtre_metier
-                and filtre_metier.lower()
-                not in metier.lower()
-            ):
-                continue
-
-            if (
-                filtre_caces
-                and filtre_caces.lower()
-                not in caces.lower()
-            ):
-                continue
-
-            if (
-                filtre_permis
-                and filtre_permis.lower()
-                not in permis.lower()
-            ):
-                continue
-
-            with st.expander(
-                f"👤 {candidat} - {metier}"
-            ):
-
-                st.write(
-                    f"**Métier :** {metier}"
+                st.subheader(
+                    cv.get("candidat")
+                    or "Candidat sans nom"
                 )
 
                 st.write(
-                    f"**Métiers recherchés / pressentis :** "
-                    f"{metiers_recherches if metiers_recherches else 'Non renseigné'}"
+                    f"**Métier :** "
+                    f"{cv.get('metier', '')}"
                 )
 
                 st.write(
-                    f"**Fin de mission :** "
-                    f"{date_fin_mission if date_fin_mission else 'Non renseignée'}"
+                    f"**Type de profil :** "
+                    f"{cv.get('type_profil', '')}"
                 )
 
                 st.write(
-                    f"**Disponibilité :** "
-                    f"{date_disponibilite if date_disponibilite else 'Non renseignée'}"
+                    f"**Métiers recherchés :** "
+                    f"{cv.get('metiers_recherches', '')}"
                 )
 
                 st.write(
-                    f"**Compétences :** {competences}"
+                    f"**Compétences :** "
+                    f"{cv.get('competences', '')}"
                 )
 
                 st.write(
-                    f"**Tâches déjà réalisées :** "
-                    f"{taches if taches else 'Non renseigné'}"
+                    f"**Tâches :** "
+                    f"{cv.get('taches', '')}"
                 )
 
                 st.write(
                     f"**CACES :** "
-                    f"{caces if caces else 'Aucun'}"
+                    f"{cv.get('caces', '')}"
                 )
 
                 st.write(
                     f"**Permis :** "
-                    f"{permis if permis else 'Non renseigné'}"
+                    f"{cv.get('permis', '')}"
                 )
 
-                if type_profil == "🟢 Intérimaire":
-
-                    st.write(
-                        "**Type de profil :** "
-                        "🟢 Intérimaire"
-                    )
-
-                else:
-
-                    st.write(
-                        "**Type de profil :** "
-                        "🟡 Candidat"
-                    )
-
-                st.caption(
-                    f"Ajouté le {date_creation}"
+                st.write(
+                    f"**Fin de mission :** "
+                    f"{cv.get('date_fin_mission', '')}"
                 )
 
-                if texte:
+                st.write(
+                    f"**Disponibilité :** "
+                    f"{cv.get('date_disponibilite', '')}"
+                )
+
+            with col2:
+
+                if cv.get("texte"):
 
                     with st.expander(
-                        "Voir le texte complet du CV"
+                        "Voir le CV"
                     ):
 
-                        st.text(
-                            texte
+                        st.write(
+                            cv.get("texte")
                         )
 
-                st.markdown("---")
+            with col3:
 
                 if st.button(
-                    "🗑️ Supprimer ce CV",
-                    key=f"suppr_cv_{cv_id}",
+                    "🗑️ Supprimer",
+                    key=f"supprimer_cv_{cv['id']}",
                 ):
 
-                    try:
+                    supprimer_cv(
+                        cv["id"]
+                    )
 
-                        supprimer_cv(
-                            cv_id
-                        )
-
-                        st.success(
-                            "CV supprimé."
-                        )
-
-                        st.rerun()
-
-                    except Exception as erreur:
-
-                        st.error(
-                            "Erreur lors de la suppression du CV."
-                        )
-
-                        st.exception(erreur)
+                    st.rerun()
 
 
 # ============================================================
-# IMPORT FICHE DE POSTE
+# IMPORTER UNE FICHE DE POSTE
 # ============================================================
 
-elif page == "🏢 Importer une fiche de poste":
+elif page == "💼 Importer une fiche de poste":
 
-    st.title(
-        "🏢 Importer une fiche de poste"
+    st.markdown(
+        '<div class="idees-title">💼 Importer une fiche de poste</div>',
+        unsafe_allow_html=True,
     )
 
     fichier = st.file_uploader(
-        "Sélectionnez une fiche de poste (PDF ou Word)",
-        type=["pdf", "docx"],
+        "Déposer une fiche de poste",
+        type=[
+            "pdf",
+            "docx",
+            "txt",
+        ],
     )
 
-    if fichier is not None:
+    if fichier:
 
-        texte = extract_text(
-            fichier
-        )
+        if st.button("Analyser la fiche de poste"):
 
-        if not texte:
-
-            st.error(
-                "Impossible d'extraire le texte de cette fiche "
-                "de poste (document scanné ou vide ?)."
-            )
-
-        else:
-
-            # =================================================
-            # LECTURE CIBLÉE
-            # =================================================
-
-            fiche_ciblee = extraire_fiche_poste_ciblee(
-                texte
-            )
-            
-            entreprise_detectee = (
-                fiche_ciblee.get("entreprise") or ""
-            )
-
-            poste_detecte_cible = (
-                fiche_ciblee.get("poste") or ""
-            )
-
-            taches_detectees_ciblees = (
-                fiche_ciblee.get("taches") or ""
-            )
-
-            entreprise_trouvee = (
-                fiche_ciblee.get(
-                    "entreprise_trouvee"
-                )
-            )
-
-            poste_trouve = (
-                fiche_ciblee.get(
-                    "poste_trouve"
-                )
-            )
-
-            taches_trouvees = (
-                fiche_ciblee.get(
-                    "taches_trouvees"
-                )
-            )
-
-            # =================================================
-            # AUTRES INFORMATIONS
-            # =================================================
-
-            competences_detectees = ""
-
-            caces_detectes = extraire_caces(
-                texte
-            )
-
-            permis_detectes = extraire_permis(
-                texte
-            )
-
-            vip_sir_detecte = detecter_vip_sir(
-                texte
-            )
-
-            # =================================================
-            # MESSAGE
-            # =================================================
-
-            if (
-                not entreprise_trouvee
-                or not poste_trouve
-                or not taches_trouvees
+            with st.spinner(
+                "Analyse de la fiche de poste..."
             ):
 
-                st.warning(
-                    "Certaines rubriques n'ont pas été détectées "
-                    "automatiquement. L'application ne va pas "
-                    "inventer de valeur."
+                texte = extract_text(
+                    fichier
                 )
 
-            if not entreprise_trouvee:
-
-                st.warning(
-                    "⚠️ La rubrique "
-                    "« Nom de l'entreprise » "
-                    "n'a pas été trouvée."
-                )
-
-            if not poste_trouve:
-
-                st.warning(
-                    "⚠️ La rubrique "
-                    "« Intitulé du poste » "
-                    "n'a pas été trouvée."
-                )
-
-            if not taches_trouvees:
-
-                st.warning(
-                    "⚠️ La rubrique "
-                    "« Liste des tâches proposées » "
-                    "n'a pas été trouvée."
-                )
-
-            st.success(
-                "Lecture ciblée terminée. "
-                "Vérifiez les informations avant d'enregistrer."
-            )
-
-            # =================================================
-            # FORMULAIRE
-            # =================================================
-
-            with st.form("form_poste"):
-
-                entreprise = st.text_input(
-                    "Entreprise cliente",
-                    value=entreprise_detectee,
-                )
-
-                poste = st.text_input(
-                    "Intitulé du poste",
-                    value=poste_detecte_cible,
-                )
-
-                competences = st.text_area(
-                    "Compétences requises",
-                    value=competences_detectees,
-                )
-
-                taches = st.text_area(
-                    "Tâches à réaliser",
-                    value=taches_detectees_ciblees,
-                    help=(
-                        "Copiées automatiquement depuis la rubrique "
-                        "« Liste des tâches proposées »."
-                    ),
-                )
-
-                caces = st.text_input(
-                    "CACES requis",
-                    value=caces_detectes,
-                )
-
-                permis = st.text_input(
-                    "Permis requis",
-                    value=permis_detectes,
-                )
-
-                options_vip = [
-                    "",
-                    "VIP",
-                    "SIR",
-                    "VIP + SIR",
-                ]
-
-                vip_sir = st.selectbox(
-                    "Suivi médical requis",
-                    options_vip,
-                    index=(
-                        options_vip.index(
-                            vip_sir_detecte
-                        )
-                        if vip_sir_detecte in options_vip
-                        else 0
-                    ),
-                    help=(
-                        "VIP = Visite Infirmier Périodique. "
-                        "SIR = Suivi Individuel Renforcé."
-                    ),
-                )
-
-                valider = st.form_submit_button(
-                    "Enregistrer cette fiche de poste"
-                )
-
-            # =================================================
-            # ENREGISTREMENT
-            # =================================================
-
-            if valider:
-
-                if not entreprise or not poste:
-
-                    st.error(
-                        "Merci de renseigner au moins "
-                        "l'entreprise et l'intitulé du poste."
-                    )
-
-                else:
-
-                    try:
-
-                        enregistrer_poste(
-                            agence,
-                            entreprise,
-                            poste,
-                            competences,
-                            caces,
-                            permis,
-                            texte,
-                            taches,
-                            vip_sir,
-                        )
-
-                        st.success(
-                            f"Fiche de poste « {poste} » "
-                            f"enregistrée pour {entreprise}."
-                        )
-
-                        st.rerun()
-
-                    except Exception as erreur:
-
-                        st.error(
-                            "Erreur lors de l'enregistrement "
-                            "de la fiche de poste."
-                        )
-
-                        st.exception(erreur)
-
-            with st.expander(
-                "Voir le texte extrait de la fiche de poste"
-            ):
-
-                st.text(
+                texte = nettoyer_texte(
                     texte
                 )
 
+                donnees = (
+                    extraire_fiche_poste_ciblee(
+                        texte
+                    )
+                )
 
-# ============================================================
-# POSTETHEQUE
-# ============================================================
+                entreprise = donnees.get(
+                    "entreprise",
+                    "",
+                )
 
-elif page == "📁 Postethèque":
+                poste = donnees.get(
+                    "poste",
+                    "",
+                )
 
-    st.title(
-        "📁 Postethèque"
-    )
+                competences = donnees.get(
+                    "competences",
+                    "",
+                )
 
-    recherche_poste = st.text_input(
-        "🔎 Rechercher une entreprise, un poste, "
-        "une compétence..."
-    )
+                taches = donnees.get(
+                    "taches",
+                    "",
+                )
 
-    col1, col2, col3 = st.columns(3)
+                caces = donnees.get(
+                    "caces",
+                    "",
+                )
 
-    with col1:
+                permis = donnees.get(
+                    "permis",
+                    "",
+                )
 
-        filtre_poste_intitule = st.text_input(
-            "💼 Intitulé du poste"
-        )
+                vip_sir = detecter_vip_sir(
+                    texte
+                )
 
-    with col2:
-
-        filtre_poste_caces = st.text_input(
-            "🚜 CACES"
-        )
-
-    with col3:
-
-        filtre_poste_permis = st.text_input(
-            "🚗 Permis"
-        )
-
-    postes_liste = recuperer_postes(
-        agence
-    )
-
-    if not postes_liste:
-
-        st.info(
-            "Aucune fiche de poste enregistrée "
-            "pour cette agence."
-        )
-
-    else:
-
-        for poste_item in postes_liste:
-
-            poste_id = poste_item.get("id")
-            entreprise = poste_item.get("entreprise") or ""
-            intitule = poste_item.get("poste") or ""
-            competences = poste_item.get("competences") or ""
-            taches = poste_item.get("taches") or ""
-            vip_sir = poste_item.get("vip_sir") or ""
-            caces = poste_item.get("caces") or ""
-            permis = poste_item.get("permis") or ""
-            date_creation = (
-                poste_item.get("date_creation") or ""
+            st.success(
+                "Fiche de poste analysée."
             )
-            texte_poste = poste_item.get("texte") or ""
 
-            texte_recherche_poste = (
-                f"{entreprise} "
-                f"{intitule} "
-                f"{competences} "
-                f"{caces} "
-                f"{permis} "
-                f"{texte_poste}"
-            ).lower()
+            entreprise = st.text_input(
+                "Entreprise",
+                value=entreprise,
+            )
 
-            if (
-                recherche_poste
-                and recherche_poste.lower()
-                not in texte_recherche_poste
-            ):
-                continue
+            poste = st.text_input(
+                "Poste",
+                value=poste,
+            )
 
-            if (
-                filtre_poste_intitule
-                and filtre_poste_intitule.lower()
-                not in intitule.lower()
-            ):
-                continue
+            competences = st.text_area(
+                "Compétences",
+                value=competences,
+            )
 
-            if (
-                filtre_poste_caces
-                and filtre_poste_caces.lower()
-                not in caces.lower()
-            ):
-                continue
+            taches = st.text_area(
+                "Tâches",
+                value=taches,
+            )
 
-            if (
-                filtre_poste_permis
-                and filtre_poste_permis.lower()
-                not in permis.lower()
-            ):
-                continue
+            caces = st.text_input(
+                "CACES",
+                value=caces,
+            )
 
-            with st.expander(
-                f"🏢 {entreprise} — {intitule}"
+            permis = st.text_input(
+                "Permis",
+                value=permis,
+            )
+
+            vip_sir = st.text_input(
+                "VIP / SIR",
+                value=vip_sir,
+            )
+
+            if st.button(
+                "💾 Enregistrer la fiche de poste"
             ):
 
-                st.write(
-                    f"**Entreprise :** {entreprise}"
+                enregistrer_poste(
+                    agence=agence,
+                    entreprise=entreprise,
+                    poste=poste,
+                    competences=competences,
+                    caces=caces,
+                    permis=permis,
+                    texte=texte,
+                    taches=taches,
+                    vip_sir=vip_sir,
                 )
 
-                st.write(
-                    f"**Intitulé du poste :** {intitule}"
+                st.success(
+                    "Fiche de poste enregistrée."
                 )
-
-                st.write(
-                    f"**Compétences requises :** "
-                    f"{competences if competences else 'Non renseigné'}"
-                )
-
-                st.write(
-                    f"**Tâches à réaliser :** "
-                    f"{taches if taches else 'Non renseigné'}"
-                )
-
-                st.write(
-                    f"**CACES requis :** "
-                    f"{caces if caces else 'Aucun'}"
-                )
-
-                st.write(
-                    f"**Permis requis :** "
-                    f"{permis if permis else 'Non renseigné'}"
-                )
-
-                st.write(
-                    f"**Suivi médical :** "
-                    f"{vip_sir if vip_sir else 'Non renseigné'}"
-                )
-
-                st.caption(
-                    f"Ajouté le {date_creation}"
-                )
-
-                if texte_poste:
-
-                    with st.expander(
-                        "Voir le texte complet de la fiche de poste"
-                    ):
-
-                        st.text(
-                            texte_poste
-                        )
-
-                st.markdown("---")
-
-                if st.button(
-                    "🗑️ Supprimer cette fiche de poste",
-                    key=f"suppr_poste_{poste_id}",
-                ):
-
-                    try:
-
-                        supprimer_poste(
-                            poste_id
-                        )
-
-                        st.success(
-                            "Fiche de poste supprimée."
-                        )
-
-                        st.rerun()
-
-                    except Exception as erreur:
-
-                        st.error(
-                            "Erreur lors de la suppression "
-                            "de la fiche de poste."
-                        )
-
-                        st.exception(erreur)
 
 
 # ============================================================
-# MATCHING
+# POSTETHÈQUE
 # ============================================================
 
-elif page == "🔍 Matching":
+elif page == "📋 Postethèque":
 
-    st.title(
-        "🔍 Matching CV / Fiches de poste"
+    st.markdown(
+        '<div class="idees-title">📋 Postethèque</div>',
+        unsafe_allow_html=True,
     )
 
     postes = recuperer_postes(
         agence
     )
 
-    cvs = recuperer_cvs_matching(
+    if not postes:
+
+        st.info(
+            "Aucune fiche de poste disponible."
+        )
+
+    for poste in postes:
+
+        with st.container():
+
+            st.markdown("---")
+
+            col1, col2 = st.columns(
+                [5, 1]
+            )
+
+            with col1:
+
+                st.subheader(
+                    poste.get(
+                        "poste",
+                        "Poste",
+                    )
+                )
+
+                st.write(
+                    f"**Entreprise :** "
+                    f"{poste.get('entreprise', '')}"
+                )
+
+                st.write(
+                    f"**Compétences :** "
+                    f"{poste.get('competences', '')}"
+                )
+
+                st.write(
+                    f"**Tâches :** "
+                    f"{poste.get('taches', '')}"
+                )
+
+                st.write(
+                    f"**CACES :** "
+                    f"{poste.get('caces', '')}"
+                )
+
+                st.write(
+                    f"**Permis :** "
+                    f"{poste.get('permis', '')}"
+                )
+
+                st.write(
+                    f"**VIP / SIR :** "
+                    f"{poste.get('vip_sir', '')}"
+                )
+
+                with st.expander(
+                    "Voir la fiche complète"
+                ):
+
+                    st.write(
+                        poste.get(
+                            "texte",
+                            "",
+                        )
+                    )
+
+            with col2:
+
+                if st.button(
+                    "🗑️ Supprimer",
+                    key=f"supprimer_poste_{poste['id']}",
+                ):
+
+                    supprimer_poste(
+                        poste["id"]
+                    )
+
+                    st.rerun()
+
+
+# ============================================================
+# MATCHING
+# ============================================================
+
+elif page == "🎯 Matching":
+
+    st.markdown(
+        '<div class="idees-title">🎯 Matching</div>',
+        unsafe_allow_html=True,
+    )
+
+    postes = recuperer_postes(
         agence
     )
 
     if not postes:
 
         st.info(
-            "Aucune fiche de poste enregistrée "
-            "pour cette agence."
-        )
-
-    elif not cvs:
-
-        st.info(
-            "Aucun CV enregistré pour cette agence."
+            "Aucun poste disponible."
         )
 
     else:
 
-        options_postes = {
-            f"{p['poste']} — {p['entreprise']}": p["id"]
+        poste_options = {
+            f"{p.get('entreprise', '')} - "
+            f"{p.get('poste', '')}": p["id"]
             for p in postes
         }
 
-        choix_poste = st.selectbox(
-            "Choisissez une fiche de poste",
-            list(options_postes.keys()),
+        poste_selection = st.selectbox(
+            "Choisir une fiche de poste",
+            list(poste_options.keys()),
         )
 
-        poste_id = options_postes[
-            choix_poste
+        poste_id = poste_options[
+            poste_selection
         ]
 
         poste = recuperer_poste(
             poste_id
         )
 
-        if not poste:
+        cvs = recuperer_cvs_matching(
+            agence
+        )
 
-            st.error(
-                "Impossible de récupérer cette fiche de poste."
+        resultats_matching = []
+
+        for cv in cvs:
+
+            score = calculer_score(
+                cv,
+                poste,
             )
 
-        else:
+            resultats_matching.append(
+                {
+                    "cv_id": cv["id"],
+                    "candidat": cv.get(
+                        "candidat",
+                        "",
+                    ),
+                    "metier": cv.get(
+                        "metier",
+                        "",
+                    ),
+                    "type_profil": cv.get(
+                        "type_profil",
+                        "",
+                    ),
+                    "score": score,
+                }
+            )
 
-            poste_nom = poste.get(
-                "poste"
-            ) or ""
+        resultats_matching.sort(
+            key=lambda x: x["score"],
+            reverse=True,
+        )
 
-            entreprise_nom = poste.get(
-                "entreprise"
-            ) or ""
+        for r in resultats_matching:
 
-            resultats = []
+            with st.container():
 
-            for cv in cvs:
+                st.markdown("---")
 
-                resultat_matching = calculer_score(
-                    cv,
-                    poste,
+                col1, col2, col3 = st.columns(
+                    [4, 2, 2]
                 )
 
-                resultats.append(
-                    {
-                        "cv_id": cv.get("id"),
-                        "candidat": cv.get("candidat") or "",
-                        "metier": resultat_matching[
-                            "metier_cv"
-                        ],
-                        "score": resultat_matching[
-                            "score"
-                        ],
-                        "explication": resultat_matching[
-                            "explication"
-                        ],
-                    }
-                )
+                with col1:
 
-            resultats.sort(
-                key=lambda r: r["score"],
-                reverse=True,
-            )
-
-            st.subheader(
-                f"Résultats pour : "
-                f"{poste_nom} — {entreprise_nom}"
-            )
-
-            for r in resultats:
-
-                with st.expander(
-                    f"{r['candidat']} — "
-                    f"{r['score']}% de compatibilité "
-                    f"({r['metier']})"
-                ):
-
-                    st.progress(
-                        min(
-                            r["score"],
-                            100
-                        ) / 100
+                    st.subheader(
+                        r["candidat"]
                     )
 
-                    for ligne_explication in (
-                        r["explication"]
-                    ):
+                    st.write(
+                        f"**Métier :** "
+                        f"{r['metier']}"
+                    )
 
-                        st.write(
-                            ligne_explication
-                        )
+                    st.write(
+                        f"**Profil :** "
+                        f"{r['type_profil']}"
+                    )
 
-                    st.markdown("---")
+                with col2:
+
+                    st.metric(
+                        "Score",
+                        f"{r['score']} %",
+                    )
+
+                with col3:
 
                     statut = st.selectbox(
-                        "Statut de la candidature",
+                        "Statut",
                         STATUTS_SUIVI,
                         key=f"statut_{r['cv_id']}",
                     )
@@ -2167,124 +1342,64 @@ elif page == "🔍 Matching":
                             "🟢 Client",
                             "🟠 Prospect",
                         ],
+                        key=f"type_entreprise_{r['cv_id']}",
                         horizontal=True,
-                        key=(
-                            f"type_entreprise_"
-                            f"{r['cv_id']}"
-                        ),
                     )
 
                     if st.button(
-                        "Ajouter au suivi",
-                        key=f"suivi_{r['cv_id']}",
+                        "➕ Ajouter au suivi",
+                        key=f"ajouter_{r['cv_id']}",
                     ):
 
-                        try:
+                        entreprise_nom = poste.get(
+                            "entreprise",
+                            "",
+                        )
 
-                            cv_complet = recuperer_cv(
-                                r["cv_id"]
-                            )
-
-                            type_profil = (
-                                cv_complet.get("type_profil")
-                                if cv_complet
-                                else ""
-                            )
-
-                            enregistrer_suivi(
-                                agence,
-                                r["candidat"],
-                                entreprise_nom,
-                                poste_nom,
-                                statut,
-                                type_entreprise,
-                                type_profil,
-                            )
-
-                            st.success(
-                                "Candidature ajoutée au suivi."
-                            )
-
-                            st.rerun()
-
-                        except Exception as erreur:
-
-                            st.error(
-                                "Erreur lors de l'ajout "
-                                "au suivi."
-                            )
-
-                            st.exception(erreur)
-
-                    st.markdown("---")
-
-                    if st.button(
-                        "📧 Générer une présentation",
-                        key=(
-                            f"presentation_"
-                            f"{r['cv_id']}"
-                        ),
-                    ):
+                        poste_nom = poste.get(
+                            "poste",
+                            "",
+                        )
 
                         cv_complet = recuperer_cv(
                             r["cv_id"]
                         )
 
-                        if cv_complet:
+                        type_profil = (
+                            cv_complet.get(
+                                "type_profil"
+                            )
+                            if cv_complet
+                            else ""
+                        )
 
-                            candidat = (
-                                cv_complet.get(
-                                    "candidat"
-                                )
-                                or ""
+                        enregistrer_suivi(
+                            agence,
+                            r["candidat"],
+                            entreprise_nom,
+                            poste_nom,
+                            statut,
+                            type_entreprise,
+                            type_profil,
+                        )
+
+                        st.success(
+                            "Candidature ajoutée au suivi."
+                        )
+
+                        presentation = generer_presentation(
+                            cv_complet,
+                            poste,
+                        )
+
+                        if presentation:
+
+                            st.markdown(
+                                "### Présentation candidat"
                             )
 
-                            metier = (
-                                cv_complet.get(
-                                    "metier"
-                                )
-                                or ""
-                            )
-
-                            competences = (
-                                cv_complet.get(
-                                    "competences"
-                                )
-                                or ""
-                            )
-
-                            caces = (
-                                cv_complet.get(
-                                    "caces"
-                                )
-                                or ""
-                            )
-
-                            permis = (
-                                cv_complet.get(
-                                    "permis"
-                                )
-                                or ""
-                            )
-
-                            texte = generer_presentation(
-                                candidat,
-                                metier,
-                                competences,
-                                caces,
-                                permis,
-                                entreprise_nom,
-                                agence,
-                            )
-
-                            st.text_area(
-                                "Présentation prête à copier",
-                                value=texte,
-                                height=300,
-                                key=(
-                                    f"texte_"
-                                    f"{r['cv_id']}"
-                                ),
+                            st.write(
+                                presentation
                             )
 
 
@@ -2292,100 +1407,102 @@ elif page == "🔍 Matching":
 # SUIVI DES CANDIDATURES
 # ============================================================
 
-elif page == "📋 Suivi des candidatures":
+elif page == "📌 Suivi des candidatures":
 
-    st.title(
-        "📋 Suivi des candidatures"
+    st.markdown(
+        '<div class="idees-title">📌 Suivi des candidatures</div>',
+        unsafe_allow_html=True,
     )
 
-    lignes = lister_suivi(
+    suivis = lister_suivi(
         agence
     )
 
-    if not lignes:
+    if not suivis:
 
         st.info(
-            "Aucune candidature suivie pour le moment."
+            "Aucune candidature enregistrée."
         )
 
-    else:
+    for ligne in suivis:
 
-        for ligne in lignes:
+        st.markdown("---")
 
-            suivi_id = ligne.get("id")
-            candidat = ligne.get("candidat") or ""
-            entreprise = ligne.get("entreprise") or ""
-            poste = ligne.get("poste") or ""
-            statut = ligne.get("statut") or ""
-            type_entreprise = (
-                ligne.get("type_entreprise") or ""
-            )
-            date_creation = (
-                ligne.get("date_creation") or ""
-            )
+        col1, col2, col3, col4 = st.columns(
+            [3, 3, 2, 2]
+        )
 
-            col1, col2 = st.columns(
-                [4, 2]
+        with col1:
+
+            st.write(
+                f"**Candidat :** "
+                f"{ligne.get('candidat', '')}"
             )
 
-            with col1:
+            st.write(
+                f"**Profil :** "
+                f"{ligne.get('type_profil', '')}"
+            )
 
-                st.write(
-                    f"**{candidat}** → "
-                    f"{poste} chez {entreprise}"
-                )
+        with col2:
 
-                if type_entreprise == "🟢 Client":
+            st.write(
+                f"**Poste :** "
+                f"{ligne.get('poste', '')}"
+            )
 
-                    st.caption(
-                        "🟢 Client"
+            st.write(
+                f"**Entreprise :** "
+                f"{ligne.get('entreprise', '')}"
+            )
+
+        with col3:
+
+            st.write(
+                f"**Entreprise :** "
+                f"{ligne.get('type_entreprise', '')}"
+            )
+
+            st.write(
+                f"**Date :** "
+                f"{str(ligne.get('date_creation', ''))[:10]}"
+            )
+
+        with col4:
+
+            nouveau_statut = st.selectbox(
+                "Statut",
+                STATUTS_SUIVI,
+                index=(
+                    STATUTS_SUIVI.index(
+                        ligne.get("statut")
+                    )
+                    if ligne.get("statut")
+                    in STATUTS_SUIVI
+                    else 0
+                ),
+                key=f"statut_suivi_{ligne['id']}",
+            )
+
+            if nouveau_statut != ligne.get(
+                "statut"
+            ):
+
+                if st.button(
+                    "💾 Modifier",
+                    key=f"modifier_{ligne['id']}",
+                ):
+
+                    modifier_statut_suivi(
+                        ligne["id"],
+                        nouveau_statut,
                     )
 
-                elif type_entreprise == "🟠 Prospect":
-
-                    st.caption(
-                        "🟠 Prospect"
+                    st.success(
+                        "Statut modifié."
                     )
 
-                st.caption(
-                    f"Ajouté le {date_creation}"
-                )
-
-            with col2:
-
-                nouveau_statut = st.selectbox(
-                    "Statut",
-                    STATUTS_SUIVI,
-                    index=(
-                        STATUTS_SUIVI.index(
-                            statut
-                        )
-                        if statut in STATUTS_SUIVI
-                        else 0
-                    ),
-                    key=f"maj_statut_{suivi_id}",
-                    label_visibility="collapsed",
-                )
-
-                if nouveau_statut != statut:
-
-                    try:
-
-                        modifier_statut_suivi(
-                            suivi_id,
-                            nouveau_statut,
-                        )
-
-                        st.rerun()
-
-                    except Exception as erreur:
-
-                        st.error(
-                            "Erreur lors de la modification "
-                            "du statut."
-                        )
-
-                        st.exception(erreur)
+                    st.rerun()
 
 
 # ============================================================
@@ -2394,15 +1511,17 @@ elif page == "📋 Suivi des candidatures":
 
 elif page == "📈 Statistiques":
 
-    st.title(
-        "📈 Statistiques de l'agence"
+    st.markdown(
+        '<div class="idees-title">📈 Statistiques</div>',
+        unsafe_allow_html=True,
     )
 
-    st.subheader(
-        "Activité par semaine"
+    st.markdown(
+        f'<div class="idees-subtitle">Agence de {agence}</div>',
+        unsafe_allow_html=True,
     )
 
-    stats = statistiques_par_semaine(
+    stats = statistiques_hebdomadaires(
         agence
     )
 
@@ -2414,11 +1533,235 @@ elif page == "📈 Statistiques":
 
     else:
 
-        for semaine, nb in stats:
+        # ----------------------------------------------------
+        # TABLEAU HEBDOMADAIRE
+        # ----------------------------------------------------
 
-            st.write(
-                f"📅 **{semaine}** : "
-                f"{nb} candidature(s)"
+        st.subheader(
+            "📅 Activité hebdomadaire"
+        )
+
+        lignes_tableau = []
+
+        for semaine, donnees in stats:
+
+            lignes_tableau.append(
+                {
+                    "Semaine": semaine,
+                    "Envoyées": donnees[
+                        "envoyees"
+                    ],
+                    "Recrutées": donnees[
+                        "recrutees"
+                    ],
+                    "Non pourvues": donnees[
+                        "non_pourvues"
+                    ],
+                    "Taux transformation": (
+                        f"{donnees['taux_transformation']:.1f} %"
+                    ),
+                    "Poids non pourvues": (
+                        f"{donnees['poids_non_pourvues']:.1f} %"
+                    ),
+                    "Clients": donnees[
+                        "clients"
+                    ],
+                    "Prospects": donnees[
+                        "prospects"
+                    ],
+                    "Intérimaires": donnees[
+                        "interimaires"
+                    ],
+                    "Candidats": donnees[
+                        "candidats"
+                    ],
+                }
             )
 
-            st.markdown("---")
+        st.dataframe(
+            lignes_tableau,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        # ----------------------------------------------------
+        # DERNIÈRE SEMAINE
+        # ----------------------------------------------------
+
+        derniere_semaine = stats[0][1]
+
+        st.subheader(
+            "📊 Dernière semaine enregistrée"
+        )
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+
+            afficher_metric(
+                "Candidatures envoyées",
+                derniere_semaine[
+                    "envoyees"
+                ],
+            )
+
+        with col2:
+
+            afficher_metric(
+                "Recrutements",
+                derniere_semaine[
+                    "recrutees"
+                ],
+            )
+
+        with col3:
+
+            afficher_metric(
+                "Commandes non pourvues",
+                derniere_semaine[
+                    "non_pourvues"
+                ],
+            )
+
+        with col4:
+
+            afficher_metric(
+                "Transformation",
+                f"{derniere_semaine['taux_transformation']:.1f} %",
+            )
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+
+            afficher_metric(
+                "Clients",
+                derniere_semaine[
+                    "clients"
+                ],
+            )
+
+        with col2:
+
+            afficher_metric(
+                "Prospects",
+                derniere_semaine[
+                    "prospects"
+                ],
+            )
+
+        with col3:
+
+            afficher_metric(
+                "Intérimaires",
+                derniere_semaine[
+                    "interimaires"
+                ],
+            )
+
+        with col4:
+
+            afficher_metric(
+                "Candidats",
+                derniere_semaine[
+                    "candidats"
+                ],
+            )
+
+        # ----------------------------------------------------
+        # DÉTAIL CLIENT / PROSPECT
+        # ----------------------------------------------------
+
+        st.subheader(
+            "🟢 Client / 🟠 Prospect"
+        )
+
+        for semaine, donnees in stats:
+
+            st.markdown(
+                f"### Semaine du {semaine}"
+            )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                st.write(
+                    f"🟢 **Clients :** "
+                    f"{donnees['clients']}"
+                )
+
+            with col2:
+
+                st.write(
+                    f"🟠 **Prospects :** "
+                    f"{donnees['prospects']}"
+                )
+
+        # ----------------------------------------------------
+        # DÉTAIL DES PROFILS
+        # ----------------------------------------------------
+
+        st.subheader(
+            "👤 Intérimaires / Candidats"
+        )
+
+        for semaine, donnees in stats:
+
+            st.markdown(
+                f"### Semaine du {semaine}"
+            )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                st.write(
+                    f"🟢 **Intérimaires :** "
+                    f"{donnees['interimaires']}"
+                )
+
+            with col2:
+
+                st.write(
+                    f"🟡 **Candidats :** "
+                    f"{donnees['candidats']}"
+                )
+
+        # ----------------------------------------------------
+        # COMMANDES NON POURVUES
+        # ----------------------------------------------------
+
+        st.subheader(
+            "⚠️ Poids des commandes non pourvues"
+        )
+
+        poids_chart = {
+            semaine: donnees[
+                "poids_non_pourvues"
+            ]
+            for semaine, donnees in stats
+        }
+
+        st.bar_chart(
+            poids_chart
+        )
+
+        # ----------------------------------------------------
+        # TAUX DE TRANSFORMATION
+        # ----------------------------------------------------
+
+        st.subheader(
+            "📈 Taux de transformation"
+        )
+
+        transformation_chart = {
+            semaine: donnees[
+                "taux_transformation"
+            ]
+            for semaine, donnees in stats
+        }
+
+        st.line_chart(
+            transformation_chart
+        )

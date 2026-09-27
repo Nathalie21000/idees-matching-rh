@@ -23,7 +23,6 @@ import base64
 import json
 
 
-
 # ============================================================
 # INITIALISATION
 # ============================================================
@@ -291,8 +290,10 @@ def lister_cv(agence):
         supabase
         .table("cv")
         .select(
-            "id, candidat, metier, metiers_recherches, date_fin_mission, date_disponibilite, competences, taches, "
-            "caces, permis, type_profil, date_creation, texte"
+            "id, candidat, metier, metiers_recherches, "
+            "date_fin_mission, date_disponibilite, "
+            "competences, taches, caces, permis, "
+            "type_profil, date_creation, texte"
         )
         .eq("agence", agence)
         .order("date_creation", desc=True)
@@ -311,8 +312,9 @@ def recuperer_cvs_matching(agence):
         supabase
         .table("cv")
         .select(
-            "id, candidat, texte, metier, metiers_recherches, date_fin_mission, date_disponibilite, competences, taches, "
-            "caces, permis, type_profil"
+            "id, candidat, texte, metier, metiers_recherches, "
+            "date_fin_mission, date_disponibilite, "
+            "competences, taches, caces, permis, type_profil"
         )
         .eq("agence", agence)
         .order("date_creation", desc=True)
@@ -434,8 +436,10 @@ def recuperer_cv(id_cv):
         supabase
         .table("cv")
         .select(
-            "id, candidat, metier, metiers_recherches, date_fin_mission, date_disponibilite, competences, taches, "
-            "caces, permis, type_profil, texte"
+            "id, candidat, metier, metiers_recherches, "
+            "date_fin_mission, date_disponibilite, "
+            "competences, taches, caces, permis, "
+            "type_profil, texte"
         )
         .eq("id", id_cv)
         .single()
@@ -505,6 +509,133 @@ def statistiques_par_semaine(agence):
         )
 
     return list(statistiques.items())
+
+
+# ============================================================
+# STATISTIQUES HEBDOMADAIRES
+# ============================================================
+
+def statistiques_hebdomadaires(agence):
+    resultat = (
+        supabase
+        .table("suivi")
+        .select(
+            "date_creation, statut, "
+            "type_entreprise, type_profil"
+        )
+        .eq("agence", agence)
+        .order("date_creation", desc=True)
+        .execute()
+    )
+
+    lignes = resultat.data or []
+    statistiques = {}
+
+    for ligne in lignes:
+
+        date_creation = ligne.get("date_creation")
+
+        if not date_creation:
+            continue
+
+        date = str(date_creation)[:10]
+
+        try:
+            annee, mois, jour = map(
+                int,
+                date.split("-")
+            )
+
+            from datetime import date as date_class
+
+            date_obj = date_class(
+                annee,
+                mois,
+                jour
+            )
+
+        except (ValueError, TypeError):
+            continue
+
+        debut_semaine = (
+            date_obj
+            - __import__("datetime").timedelta(
+                days=date_obj.weekday()
+            )
+        )
+
+        semaine = debut_semaine.isoformat()
+
+        if semaine not in statistiques:
+            statistiques[semaine] = {
+                "envoyees": 0,
+                "recrutees": 0,
+                "non_pourvues": 0,
+                "clients": 0,
+                "prospects": 0,
+                "interimaires": 0,
+                "candidats": 0,
+            }
+
+        stats = statistiques[semaine]
+
+        stats["envoyees"] += 1
+
+        statut = ligne.get("statut")
+        type_entreprise = ligne.get("type_entreprise")
+        type_profil = ligne.get("type_profil")
+
+        if statut == "Recruté":
+            stats["recrutees"] += 1
+
+        if statut == "Commande non pourvue":
+            stats["non_pourvues"] += 1
+
+        if type_entreprise == "🟢 Client":
+            stats["clients"] += 1
+
+        if type_entreprise == "🟠 Prospect":
+            stats["prospects"] += 1
+
+        if type_profil == "Intérimaire":
+            stats["interimaires"] += 1
+
+        if type_profil == "Candidat":
+            stats["candidats"] += 1
+
+    for stats in statistiques.values():
+
+        candidatures_eligibles = (
+            stats["envoyees"]
+            - stats["non_pourvues"]
+        )
+
+        if candidatures_eligibles > 0:
+            stats["taux_transformation"] = round(
+                stats["recrutees"]
+                / candidatures_eligibles
+                * 100,
+                1
+            )
+        else:
+            stats["taux_transformation"] = 0
+
+        if stats["envoyees"] > 0:
+            stats["poids_non_pourvues"] = round(
+                stats["non_pourvues"]
+                / stats["envoyees"]
+                * 100,
+                1
+            )
+        else:
+            stats["poids_non_pourvues"] = 0
+
+    return list(
+        sorted(
+            statistiques.items(),
+            reverse=True
+        )
+    )
 
 
 # ============================================================
