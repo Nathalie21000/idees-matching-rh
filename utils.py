@@ -922,8 +922,24 @@ def extract_text(file):
             )
 
         # ----------------------------------------------------
-        # Si l'extraction classique ne reconnaît pas la fiche,
-        # on tente quand même l'OCR spécialisé.
+        # PDF classique / CV : priorité au texte natif
+        # ----------------------------------------------------
+        # IMPORTANT : un PDF peut être parfaitement lisible par
+        # PyMuPDF tout en donnant un résultat beaucoup plus
+        # mauvais si on le repasse ensuite dans l'OCR.
+        # Pour les CV, on conserve donc le texte natif dès qu'il
+        # est suffisamment riche. L'OCR ne sert qu'en secours.
+
+        if texte_normal and len(
+            texte_normal.strip()
+        ) >= 30:
+
+            return nettoyer_texte(
+                texte_normal
+            )
+
+        # ----------------------------------------------------
+        # Dernier recours : OCR
         # ----------------------------------------------------
 
         texte_ocr = (
@@ -936,18 +952,6 @@ def extract_text(file):
 
             return nettoyer_texte(
                 texte_ocr
-            )
-
-        # ====================================================
-        # PDF CLASSIQUE : TEXTE NORMAL
-        # ====================================================
-
-        if texte_normal and len(
-            texte_normal.strip()
-        ) >= 30:
-
-            return nettoyer_texte(
-                texte_normal
             )
 
         return ""
