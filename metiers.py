@@ -693,6 +693,179 @@ def extraire_taches_depuis_texte(
 # VIP / SIR
 # ============================================================
 
+
+# ---------------------------------------------------------------------------
+# Extraction identité / CACES / permis
+# ---------------------------------------------------------------------------
+
+MOTS_INTERDITS_IDENTITE = {
+    "profil",
+    "candidat",
+    "candidate",
+    "cv",
+    "curriculum vitae",
+    "coordonnees",
+    "compétences",
+    "competences",
+    "experience",
+    "expérience",
+    "formation",
+    "formations",
+    "contact",
+    "adresse",
+    "telephone",
+    "téléphone",
+    "email",
+    "mail",
+    "permis",
+    "caces",
+    "disponibilité",
+    "disponibilite",
+}
+
+
+def _nettoyer_ligne(ligne):
+    ligne = re.sub(r"^[\s•▪●◦*-]+", "", str(ligne))
+    ligne = re.sub(r"\s+", " ", ligne)
+    return ligne.strip(" -:|,.;")
+
+
+def _est_nom_plausible(valeur):
+    if not valeur or len(valeur) > 70:
+        return False
+
+    propre = re.sub(r"\s+", " ", valeur).strip(" -:|,.;")
+    n = _normaliser(propre)
+
+    if len(n) < 4 or any(x in n for x in MOTS_INTERDITS_IDENTITE):
+        return False
+
+    mots = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ'’\-]+", propre)
+
+    if not 2 <= len(mots) <= 4:
+        return False
+
+    if any(len(m) < 2 for m in mots):
+        return False
+
+    if len(mots) == 2 and all(m[0].isupper() for m in mots):
+        return True
+
+    return len(mots) == 2 and all(m[0].isalpha() for m in mots)
+
+
+def extraire_candidat(texte):
+    if not texte:
+        return ""
+
+    lignes = [
+        l.strip()
+        for l in str(texte).replace("\r", "\n").split("\n")
+        if l.strip()
+    ]
+
+    # 1. Libellés explicites.
+    for ligne in lignes[:80]:
+        m = re.search(
+            r"^\s*(?:nom\s*(?:et|&)\s*prénom|prénom|nom|candidat|candidate)\s*[:\-]\s*(.+)$",
+            ligne,
+            re.I,
+        )
+
+        if m and _est_nom_plausible(m.group(1).strip(" -:|")):
+            return m.group(1).strip(" -:|").title()
+
+    # 2. Identité seule dans l'en-tête.
+    for ligne in lignes[:12]:
+        propre = _nettoyer_ligne(ligne)
+
+        if _est_nom_plausible(propre):
+            return propre.title()
+
+    return ""
+
+
+def extraire_caces(texte):
+    if not texte:
+        return ""
+
+    brut = str(texte)
+    trouves = []
+
+    for m in re.finditer(
+        r"\bcaces?\s*(?:cat(?:égorie)?\s*)?([A-Z]?\d{1,2})\b",
+        brut,
+        re.I,
+    ):
+        valeur = m.group(1).upper()
+
+        if valeur not in trouves:
+            trouves.append(valeur)
+
+    for m in re.finditer(r"\bR4\d{2}\b", brut, re.I):
+        valeur = m.group(0).upper()
+        contexte = brut[max(0, m.start() - 50):m.end() + 50].lower()
+
+        if (
+            "caces" in contexte
+            or "engin" in contexte
+            or "chariot" in contexte
+        ):
+            if valeur not in trouves:
+                trouves.append(valeur)
+
+    return ", ".join(trouves)
+
+
+def extraire_permis(texte):
+    if not texte:
+        return ""
+
+    brut = str(texte)
+    trouves = []
+
+    for m in re.finditer(
+        r"\bpermis\s*(?:de\s*conduire\s*)?[:\-]?\s*([A-Z]{1,2}(?:E)?)\b",
+        brut,
+        re.I,
+    ):
+        valeur = m.group(1).upper()
+
+        if (
+            valeur in {"A", "AM", "B", "BE", "C", "CE", "D", "DE"}
+            and valeur not in trouves
+        ):
+            trouves.append(valeur)
+
+    for bloc_permis in re.findall(
+        r"\bpermis\b([^\n]{0,50})",
+        brut,
+        re.I,
+    ):
+        for valeur in re.findall(
+            r"\b(A|AM|B|BE|C|CE|D|DE)\b",
+            bloc_permis,
+            re.I,
+        ):
+            valeur = valeur.upper()
+
+            if valeur not in trouves:
+                trouves.append(valeur)
+
+    if re.search(r"\bpermis\s*(?:poids\s*lourd|PL)\b", brut, re.I):
+        if "PL" not in trouves:
+            trouves.append("PL")
+
+    if re.search(
+        r"\bpermis\s*(?:super\s*poids\s*lourd|SPL)\b",
+        brut,
+        re.I,
+    ):
+        if "SPL" not in trouves:
+            trouves.append("SPL")
+
+    return ", ".join(trouves)
+
 def detecter_vip_sir(texte):
     """
     Détecte si le texte mentionne un suivi VIP et/ou SIR.
