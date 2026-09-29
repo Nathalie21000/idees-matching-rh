@@ -33,6 +33,10 @@ from metiers import (
     detecter_metier,
     extraire_competences_pro,
     extraire_taches,
+    extraire_taches_depuis_texte,
+    extraire_candidat,
+    extraire_caces,
+    extraire_permis,
     detecter_vip_sir,
 )
 
@@ -211,14 +215,93 @@ def afficher_metric(titre, valeur):
 
 
 def nettoyer_texte(texte):
+    """
+    Nettoyage du texte sans supprimer la structure du document.
+
+    IMPORTANT :
+    On conserve les retours à la ligne afin de permettre à
+    metiers.py d'analyser correctement les rubriques, les colonnes,
+    les listes et les tâches d'un CV.
+    """
     if not texte:
         return ""
 
-    return re.sub(
-        r"\s+",
-        " ",
-        str(texte)
-    ).strip()
+    texte = str(texte).replace("\r\n", "\n").replace("\r", "\n")
+
+    lignes = []
+
+    for ligne in texte.split("\n"):
+        ligne = re.sub(r"[ \t]+", " ", ligne).strip()
+
+        if ligne:
+            lignes.append(ligne)
+
+    return "\n".join(lignes).strip()
+
+
+def _cle_fichier(fichier):
+    """
+    Génère une clé stable pour détecter un nouveau fichier
+    dans le file_uploader.
+    """
+    if not fichier:
+        return ""
+
+    try:
+        contenu = fichier.getvalue()
+        taille = len(contenu)
+        debut = contenu[:1000]
+        return f"{fichier.name}_{taille}_{hash(debut)}"
+    except Exception:
+        return fichier.name
+
+
+def _initialiser_etat_cv(cle_fichier):
+    """
+    Prépare les données d'analyse CV dans session_state.
+
+    Cette fonction évite de perdre l'analyse entre le bouton
+    'Analyser le CV' et le bouton 'Enregistrer le CV'.
+    """
+    cle_actuelle = st.session_state.get("cv_cle_fichier")
+
+    if cle_actuelle != cle_fichier:
+        st.session_state.cv_cle_fichier = cle_fichier
+        st.session_state.cv_analyse = False
+
+        st.session_state.cv_texte = ""
+        st.session_state.cv_candidat = ""
+        st.session_state.cv_metier = ""
+        st.session_state.cv_competences = ""
+        st.session_state.cv_taches = ""
+        st.session_state.cv_caces = ""
+        st.session_state.cv_permis = ""
+
+        st.session_state.cv_metiers_recherches = ""
+        st.session_state.cv_type_profil = "🟢 Intérimaire"
+        st.session_state.cv_date_fin_mission = None
+        st.session_state.cv_date_disponibilite = None
+
+
+def _initialiser_etat_poste(cle_fichier):
+    """
+    Prépare les données d'analyse de fiche de poste dans
+    session_state.
+    """
+    cle_actuelle = st.session_state.get("poste_cle_fichier")
+
+    if cle_actuelle != cle_fichier:
+        st.session_state.poste_cle_fichier = cle_fichier
+        st.session_state.poste_analyse = False
+
+        st.session_state.poste_texte = ""
+        st.session_state.poste_entreprise = ""
+        st.session_state.poste_nom = ""
+        st.session_state.poste_competences = ""
+        st.session_state.poste_taches = ""
+        st.session_state.poste_caces = ""
+        st.session_state.poste_permis = ""
+        st.session_state.poste_vip_sir = ""
 
 
 # ============================================================
@@ -752,32 +835,169 @@ elif page == "📄 Importer un CV":
             "docx",
             "txt",
         ],
+        key="uploader_cv",
     )
 
     if fichier:
 
-        if st.button("Analyser le CV"):
+        cle_fichier = _cle_fichier(fichier)
+        _initialiser_etat_cv(cle_fichier)
+
+        # ----------------------------------------------------
+        # ANALYSE DU CV
+        # ----------------------------------------------------
+
+        if st.button(
+            "Analyser le CV",
+            key="analyser_cv",
+        ):
 
             with st.spinner("Analyse du CV en cours..."):
 
                 texte = extract_text(fichier)
 
+                # IMPORTANT :
+                # On conserve les retours à la ligne et donc
+                # la structure du CV. Cela permet de gérer :
+                # - les CV classiques ;
+                # - les CV avec compétences centrées ;
+                # - les CV à deux colonnes ;
+                # - les listes à puces ;
+                # - les rubriques d'expérience.
                 texte = nettoyer_texte(texte)
 
-                metier = detecter_metier(texte)
-
-                competences = extraire_competences_pro(
+                candidat_detecte = extraire_candidat(
                     texte
                 )
 
-                taches = extraire_taches(
+                # Filet de sécurité si l'OCR a déformé le nom.
+                if not candidat_detecte:
+                    candidat_detecte = extraire_candidat(
+                        fichier.name
+                    )
+
+                metier_detecte = detecter_metier(
                     texte
                 )
+
+                competences_liste = (
+                    extraire_competences_pro(
+                        texte
+                    )
+                )
+
+                competences_detectees = "\n".join(
+                    competences_liste
+                )
+
+                taches_liste = extraire_taches(
+                    texte
+                )
+
+                taches_secondaires = (
+                    extraire_taches_depuis_texte(
+                        texte
+                    )
+                )
+
+                for tache in taches_secondaires:
+
+                    if tache not in taches_liste:
+                        taches_liste.append(
+                            tache
+                        )
+
+                taches_detectees = "\n".join(
+                    taches_liste
+                )
+
+                caces_detectes = extraire_caces(
+                    texte
+                )
+
+                permis_detectes = extraire_permis(
+                    texte
+                )
+
+                # ------------------------------------------------
+                # CONSERVATION DANS SESSION_STATE
+                # ------------------------------------------------
+
+                st.session_state.cv_texte = texte
+                st.session_state.cv_candidat = (
+                    candidat_detecte
+                    or ""
+                )
+                st.session_state.cv_metier = (
+                    metier_detecte
+                    or ""
+                )
+                st.session_state.cv_competences = (
+                    competences_detectees
+                    or ""
+                )
+                st.session_state.cv_taches = (
+                    taches_detectees
+                    or ""
+                )
+                st.session_state.cv_caces = (
+                    caces_detectes
+                    or ""
+                )
+                st.session_state.cv_permis = (
+                    permis_detectes
+                    or ""
+                )
+
+                st.session_state.cv_analyse = True
 
             st.success("CV analysé.")
 
+        # ----------------------------------------------------
+        # AFFICHAGE DES DONNÉES APRÈS ANALYSE
+        # ----------------------------------------------------
+
+        if st.session_state.get(
+            "cv_analyse",
+            False,
+        ):
+
             candidat = st.text_input(
-                "Nom du candidat",
+                "Nom et prénom",
+                key="cv_candidat",
+                help=(
+                    "Détectés automatiquement dans le CV. "
+                    "Vous pouvez corriger ou compléter."
+                ),
+            )
+
+            metier = st.text_input(
+                "Métier détecté",
+                key="cv_metier",
+            )
+
+            competences = st.text_area(
+                "Compétences détectées",
+                key="cv_competences",
+                height=180,
+                help=(
+                    "La rubrique Compétences du CV est récupérée "
+                    "en priorité. L'analyse conserve la structure "
+                    "du document afin de gérer les CV classiques, "
+                    "centrés ou organisés en colonnes."
+                ),
+            )
+
+            taches = st.text_area(
+                "Tâches / missions déjà réalisées",
+                key="cv_taches",
+                height=180,
+                help=(
+                    "Les tâches sont recherchées dans les rubriques "
+                    "de compétences et d'expérience. Les CV avec "
+                    "mise en page en colonnes sont également pris "
+                    "en compte."
+                ),
             )
 
             type_profil = st.radio(
@@ -786,37 +1006,62 @@ elif page == "📄 Importer un CV":
                     "🟢 Intérimaire",
                     "🟡 Candidat",
                 ],
+                key="cv_type_profil",
                 horizontal=True,
             )
 
             metiers_recherches = st.text_input(
                 "Métiers recherchés",
+                key="cv_metiers_recherches",
             )
 
             col1, col2 = st.columns(2)
 
             with col1:
+
                 date_fin_mission = st.date_input(
                     "Date de fin de mission",
-                    value=None,
+                    value=st.session_state.get(
+                        "cv_date_fin_mission"
+                    ),
+                    key="cv_date_fin_mission",
                 )
 
             with col2:
+
                 date_disponibilite = st.date_input(
                     "Date de disponibilité",
-                    value=None,
+                    value=st.session_state.get(
+                        "cv_date_disponibilite"
+                    ),
+                    key="cv_date_disponibilite",
                 )
 
             caces = st.text_input(
-                "CACES",
+                "CACES détectés",
+                key="cv_caces",
+                help=(
+                    "Détectés automatiquement dans le CV. "
+                    "Vous pouvez corriger ou compléter."
+                ),
             )
 
             permis = st.text_input(
-                "Permis",
+                "Permis détectés",
+                key="cv_permis",
+                help=(
+                    "Détectés automatiquement dans le CV. "
+                    "Vous pouvez corriger ou compléter."
+                ),
             )
 
+            # ------------------------------------------------
+            # ENREGISTREMENT
+            # ------------------------------------------------
+
             if st.button(
-                "💾 Enregistrer le CV"
+                "💾 Enregistrer le CV",
+                key="enregistrer_cv",
             ):
 
                 type_profil_stockage = (
@@ -834,7 +1079,10 @@ elif page == "📄 Importer un CV":
                     caces=caces,
                     permis=permis,
                     type_profil=type_profil_stockage,
-                    texte=texte,
+                    texte=st.session_state.get(
+                        "cv_texte",
+                        "",
+                    ),
                     taches=taches,
                     metiers_recherches=metiers_recherches,
                     date_fin_mission=(
@@ -852,6 +1100,11 @@ elif page == "📄 Importer un CV":
                 st.success(
                     "CV enregistré dans la CVthèque."
                 )
+
+                # On conserve le résultat affiché mais on
+                # désactive l'état d'analyse pour éviter un
+                # double enregistrement accidentel.
+                st.session_state.cv_analyse = False
 
 
 # ============================================================
@@ -1003,11 +1256,22 @@ elif page == "💼 Importer une fiche de poste":
             "docx",
             "txt",
         ],
+        key="uploader_poste",
     )
 
     if fichier:
 
-        if st.button("Analyser la fiche de poste"):
+        cle_fichier = _cle_fichier(fichier)
+        _initialiser_etat_poste(cle_fichier)
+
+        # ----------------------------------------------------
+        # ANALYSE DE LA FICHE
+        # ----------------------------------------------------
+
+        if st.button(
+            "Analyser la fiche de poste",
+            key="analyser_poste",
+        ):
 
             with st.spinner(
                 "Analyse de la fiche de poste..."
@@ -1061,47 +1325,86 @@ elif page == "💼 Importer une fiche de poste":
                     texte
                 )
 
+                # ------------------------------------------------
+                # CONSERVATION DANS SESSION_STATE
+                # ------------------------------------------------
+
+                st.session_state.poste_texte = texte
+                st.session_state.poste_entreprise = (
+                    entreprise or ""
+                )
+                st.session_state.poste_nom = (
+                    poste or ""
+                )
+                st.session_state.poste_competences = (
+                    competences or ""
+                )
+                st.session_state.poste_taches = (
+                    taches or ""
+                )
+                st.session_state.poste_caces = (
+                    caces or ""
+                )
+                st.session_state.poste_permis = (
+                    permis or ""
+                )
+                st.session_state.poste_vip_sir = (
+                    vip_sir or ""
+                )
+
+                st.session_state.poste_analyse = True
+
             st.success(
                 "Fiche de poste analysée."
             )
 
+        # ----------------------------------------------------
+        # AFFICHAGE DES DONNÉES
+        # ----------------------------------------------------
+
+        if st.session_state.get(
+            "poste_analyse",
+            False,
+        ):
+
             entreprise = st.text_input(
                 "Entreprise",
-                value=entreprise,
+                key="poste_entreprise",
             )
 
             poste = st.text_input(
                 "Poste",
-                value=poste,
+                key="poste_nom",
             )
 
             competences = st.text_area(
                 "Compétences",
-                value=competences,
+                key="poste_competences",
             )
 
             taches = st.text_area(
                 "Tâches",
-                value=taches,
+                key="poste_taches",
             )
 
             caces = st.text_input(
                 "CACES",
-                value=caces,
+                key="poste_caces",
             )
 
             permis = st.text_input(
                 "Permis",
-                value=permis,
+                key="poste_permis",
             )
 
             vip_sir = st.text_input(
                 "VIP / SIR",
-                value=vip_sir,
+                key="poste_vip_sir",
             )
 
             if st.button(
-                "💾 Enregistrer la fiche de poste"
+                "💾 Enregistrer la fiche de poste",
+                key="enregistrer_poste",
             ):
 
                 enregistrer_poste(
@@ -1111,7 +1414,10 @@ elif page == "💼 Importer une fiche de poste":
                     competences=competences,
                     caces=caces,
                     permis=permis,
-                    texte=texte,
+                    texte=st.session_state.get(
+                        "poste_texte",
+                        "",
+                    ),
                     taches=taches,
                     vip_sir=vip_sir,
                 )
@@ -1119,6 +1425,8 @@ elif page == "💼 Importer une fiche de poste":
                 st.success(
                     "Fiche de poste enregistrée."
                 )
+
+                st.session_state.poste_analyse = False
 
 
 # ============================================================
@@ -1337,7 +1645,9 @@ elif page == "🎯 Matching":
                     )
 
                     if r.get("explication"):
-                        with st.expander("Voir le détail du matching"):
+                        with st.expander(
+                            "Voir le détail du matching"
+                        ):
                             for ligne in r["explication"]:
                                 st.write(ligne)
 
@@ -1400,11 +1710,27 @@ elif page == "🎯 Matching":
                             "Candidature ajoutée au suivi."
                         )
 
-                        presentation = generer_presentation(
-                            cv_complet,
-                            poste,
-                        )
+                    # ------------------------------------------------
+                    # MESSAGE DE PRÉSENTATION
+                    # ------------------------------------------------
 
+                    if st.button(
+                        "✉️ Générer un message de présentation",
+                        key=f"presentation_{r['cv_id']}",
+                    ):
+
+                        cv_complet = recuperer_cv(r["cv_id"])
+
+                        presentation = generer_presentation(
+                           cv_complet.get("candidat", r["candidat"]),
+                           poste.get("poste", ""),
+                           cv_complet.get("competences", ""),
+                           cv_complet.get("caces", ""),
+                           cv_complet.get("permis", ""),
+                           poste.get("entreprise", ""),
+                           agence,
+                        )
+                    
                         if presentation:
 
                             st.markdown(
@@ -1413,6 +1739,13 @@ elif page == "🎯 Matching":
 
                             st.write(
                                 presentation
+                            )
+
+                        else:
+
+                            st.info(
+                                "Impossible de générer une présentation "
+                                "avec les informations disponibles."
                             )
 
 
